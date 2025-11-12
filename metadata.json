@@ -1,0 +1,5 @@
+{
+  "name": "AI Storybook Generator",
+  "description": "An application for boys to generate colorful, imaginative storybooks from their own stories in English or Amharic. It helps them learn to read by pairing their words with AI-generated pictures, creating a fun, printable book.",
+  "requestFramePermissions": []
+}
