@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -238,14 +239,19 @@
         body * {
           visibility: hidden;
         }
+        .no-print {
+            display: none !important;
+        }
         #printable-area, #printable-area * {
           visibility: visible;
+          display: block !important; /* Force display to override 'hidden' class */
         }
         #printable-area {
           position: absolute;
           left: 0;
           top: 0;
           width: 100%;
+          z-index: 9999;
         }
         .print-spread {
             display: flex !important;

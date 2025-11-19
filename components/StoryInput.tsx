@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Language, Character } from '../types';
+import { Language, Character, SavedStory } from '../types';
 
 interface StoryInputProps {
   storyPrompt: string;
@@ -12,9 +13,24 @@ interface StoryInputProps {
   setLanguage: (language: Language) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  savedStories: SavedStory[];
+  onLoadSavedStory: (story: SavedStory) => void;
 }
 
-const StoryInput: React.FC<StoryInputProps> = ({ storyPrompt, setStoryPrompt, character, setCharacter, characterImage, setCharacterImage, language, setLanguage, onSubmit, isLoading }) => {
+const StoryInput: React.FC<StoryInputProps> = ({ 
+  storyPrompt, 
+  setStoryPrompt, 
+  character, 
+  setCharacter, 
+  characterImage, 
+  setCharacterImage, 
+  language, 
+  setLanguage, 
+  onSubmit, 
+  isLoading,
+  savedStories,
+  onLoadSavedStory
+}) => {
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,8 +52,32 @@ const StoryInput: React.FC<StoryInputProps> = ({ storyPrompt, setStoryPrompt, ch
   const isSubmittable = !isLoading && storyPrompt.trim().length >= 10 && character.name.trim().length > 0 && (character.appearance.trim().length > 0 || characterImage) && character.trait.trim().length > 0;
 
   return (
-    <div className="w-full max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
-      <h2 className="text-3xl sm:text-4xl font-extrabold text-center text-slate-800 tracking-tight">Create Your Hero's Adventure!</h2>
+    <div className="w-full max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl space-y-6 relative">
+      
+      {/* Saved Stories Dropdown */}
+      {savedStories.length > 0 && (
+        <div className="absolute top-6 right-6 z-10">
+            <select 
+                onChange={(e) => {
+                    const story = savedStories.find(s => s.id === e.target.value);
+                    if (story) onLoadSavedStory(story);
+                    e.target.value = ""; // Reset selection
+                }}
+                disabled={isLoading}
+                className="bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold cursor-pointer hover:bg-blue-100 transition-colors"
+                defaultValue=""
+            >
+                <option value="" disabled>📂 Load a saved story...</option>
+                {savedStories.map(story => (
+                    <option key={story.id} value={story.id}>
+                        {story.title} ({story.character.name})
+                    </option>
+                ))}
+            </select>
+        </div>
+      )}
+
+      <h2 className="text-3xl sm:text-4xl font-extrabold text-center text-slate-800 tracking-tight mt-4">Create Your Hero's Adventure!</h2>
       
        <div className="space-y-4 p-4 border-2 border-dashed rounded-lg text-center">
         {!characterImage ? (

@@ -26,14 +26,34 @@ function saveStoryToStorage(story: Omit<SavedStory, 'id' | 'createdAt'>): SavedS
     id: Date.now().toString(),
     createdAt: Date.now(),
   };
-  stories.unshift(newStory);
+  
+  // Try to save with full assets
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stories));
+    const storiesToSave = [newStory, ...stories];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storiesToSave));
     return newStory;
   } catch (error) {
-    console.error("Failed to save story:", error);
-    // This custom error helps differentiate from API errors.
-    throw new Error("Could not save the story. The browser's storage might be full.");
+    // If storage is full, try saving without heavy assets (images/audio)
+    console.warn("Storage full, attempting to save without cached assets...");
+    
+    const strippedPages = newStory.pages.map(p => ({
+        pageText: p.pageText,
+        imagePrompt: p.imagePrompt,
+        animation: p.animation
+        // Omit imageUrl and audioData
+    }));
+    
+    const strippedStory = { ...newStory, pages: strippedPages };
+    const storiesToSave = [strippedStory, ...stories];
+    
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(storiesToSave));
+        alert("Story saved! However, images and audio could not be saved due to browser storage limits. They will be regenerated when you load the story next time.");
+        return strippedStory;
+    } catch (finalError) {
+        console.error("Failed to save story even without assets:", finalError);
+        throw new Error("Could not save the story. The browser's storage is completely full.");
+    }
   }
 }
 
@@ -113,27 +133,33 @@ function App() {
     setStoryId(null);
 
     try {
-      setLoadingMessage("Getting your hero ready...");
-      let cartoonImg = null;
-      if (characterImage) {
-        cartoonImg = await cartoonizeImage(characterImage);
-        setCartoonizedCharacterImage(cartoonImg);
-      }
-
       setView('storybook');
+      
+      // PHASE 1: Parallel Story Text Generation and Character Style
+      setLoadingMessage("Dreaming up the story and styling your hero...");
+      
+      const storyPromise = generateFullStory(character, language, storyPrompt);
+      const cartoonPromise = characterImage ? cartoonizeImage(characterImage) : Promise.resolve(null);
 
-      setLoadingMessage("Writing a grand adventure...");
-      const fullStory = await generateFullStory(character, language, storyPrompt);
+      // Run both in parallel
+      const [fullStory, cartoonImg] = await Promise.all([storyPromise, cartoonPromise]);
+      
+      setCartoonizedCharacterImage(cartoonImg);
       setStoryTitle(fullStory.title);
       setStoryBlueprints(fullStory.pages);
 
-      setLoadingMessage("Drawing all the pictures...");
+      // PHASE 2: Parallel Image and Audio Generation
+      setLoadingMessage("Painting the pictures and recording the voice...");
+      
+      // Prepare all promises
       const imagePromises = fullStory.pages.map(p => generateImage(p.imagePrompt, cartoonImg));
-      const imageUrls = await Promise.all(imagePromises);
-
-      setLoadingMessage("Recording the narrator's voice...");
       const audioPromises = fullStory.pages.map(p => generateSpeech(p.pageText));
-      const audioData = await Promise.all(audioPromises);
+
+      // Run images and audio batches in parallel
+      const [imageUrls, audioData] = await Promise.all([
+          Promise.all(imagePromises),
+          Promise.all(audioPromises)
+      ]);
       
       const finalPages: Page[] = fullStory.pages.map((p, i) => ({
         pageText: p.pageText,
@@ -179,10 +205,13 @@ function App() {
         return;
     }
     try {
-      const pagesToSave: SavedStoryPage[] = storyBlueprints.map(p => ({
+      // Map pages to include generated assets if they exist
+      const pagesToSave: SavedStoryPage[] = storyBlueprints.map((p, i) => ({
         pageText: p.pageText,
         imagePrompt: p.imagePrompt,
         animation: p.animation,
+        imageUrl: storyPages[i]?.imageUrl,
+        audioData: storyAudio[i]
       }));
 
       saveStoryToStorage({
@@ -249,9 +278,27 @@ function App() {
         setCartoonizedCharacterImage(cartoonImg);
       }
       
-      setLoadingMessage("Redrawing all the pictures...");
-      const imagePromises = story.pages.map(p => generateImage(p.imagePrompt, cartoonImg));
-      const imageUrls = await Promise.all(imagePromises);
+      let imageUrls: string[] = [];
+      let audioData: (string | null)[] = [];
+
+      // Check if we have cached assets (all pages have imageUrl)
+      const hasCachedAssets = story.pages.every(p => !!p.imageUrl);
+
+      if (hasCachedAssets) {
+          console.log("Loading from cache...");
+          setLoadingMessage("Restoring your colorful pictures...");
+          // Small delay to allow UI to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+          imageUrls = story.pages.map(p => p.imageUrl!);
+          audioData = story.pages.map(p => p.audioData || null);
+      } else {
+          console.log("Regenerating assets...");
+          setLoadingMessage("Redrawing all the pictures...");
+          const imagePromises = story.pages.map(p => generateImage(p.imagePrompt, cartoonImg));
+          imageUrls = await Promise.all(imagePromises);
+          // Saved stories without cache generate audio on-demand, so initialize with null
+          audioData = story.pages.map(() => null);
+      }
 
       const finalPages: Page[] = story.pages.map((p, i) => ({
         pageText: p.pageText,
@@ -260,8 +307,7 @@ function App() {
       }));
 
       setStoryPages(finalPages);
-      // Saved stories generate audio on-demand, so initialize with null
-      setStoryAudio(finalPages.map(() => null));
+      setStoryAudio(audioData);
       setIsViewingSaved(true);
       setIsSaved(true);
       setStoryId(story.id); // Set the key from the saved story to force remount
@@ -303,7 +349,7 @@ function App() {
                       onClick={() => setView('saved')}
                       className="bg-white text-slate-800 font-bold py-2 px-6 rounded-lg shadow-md hover:bg-slate-200 transition-all"
                   >
-                      My Saved Stories
+                      Manage Saved Stories
                   </button>
               )}
               {view === 'saved' && (
@@ -342,6 +388,8 @@ function App() {
                   setStoryPrompt={setStoryPrompt}
                   onSubmit={handleStartStory}
                   isLoading={isLoading}
+                  savedStories={savedStories}
+                  onLoadSavedStory={handleLoadStory}
                 />
             )}
             {view === 'saved' && (
@@ -364,6 +412,7 @@ function App() {
                 language={language}
                 isViewingSaved={isViewingSaved}
                 isSaved={isSaved}
+                storyTitle={storyTitle}
               />
             )}
           </div>

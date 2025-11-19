@@ -106,8 +106,8 @@ const PageContent: React.FC<PageContentProps> = React.memo(({
       <img src={page.imageUrl} alt="Story illustration" className="w-full h-1/2 object-cover rounded-lg mb-4 shadow" />
       <div className={`flex-grow overflow-y-auto pr-2 relative ${highlightedWordIndex > -1 ? 'is-reading' : ''}`}>
         <div className="flex flex-col gap-3">
-           {/* Audio Controls */}
-           <div className="flex flex-wrap items-center gap-2 mb-1">
+           {/* Audio Controls - Hidden in Print */}
+           <div className="flex flex-wrap items-center gap-2 mb-1 no-print">
              {isLoadingAudio ? (
                 <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                   <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -197,9 +197,10 @@ interface StorybookViewerProps {
   language: Language;
   isViewingSaved: boolean;
   isSaved: boolean;
+  storyTitle?: string;
 }
 
-const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, language, onExit, onSaveStory, isViewingSaved, isSaved }) => {
+const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, language, onExit, onSaveStory, isViewingSaved, isSaved, storyTitle }) => {
   const [currentSpread, setCurrentSpread] = useState(0);
   const [audioBuffers, setAudioBuffers] = useState<(AudioBuffer | null)[]>([]);
   
@@ -213,13 +214,11 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0); // Store start time of current playback segment
+  const startTimeRef = useRef<number>(0); 
 
   useEffect(() => {
-    // Initialize AudioContext
     audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     
-    // Pre-decode all available audio
     const decodeAllAudio = async () => {
         if (!audioContextRef.current) return;
         const decodedBuffers = await Promise.all(pageAudio.map(audioBase64 => {
@@ -262,14 +261,12 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
   }, []);
 
   const playPageAudio = useCallback(async (pageIndex: number, speed: number = 1) => {
-    // If different page or speed, stop previous
     if (activePageIndex !== null) {
         hardStop();
     }
 
     let buffer = audioBuffers[pageIndex];
 
-    // On-demand generation for saved stories or missing buffers
     if (!buffer && pages[pageIndex]) {
         try {
             setLoadingAudioIndex(pageIndex);
@@ -294,7 +291,6 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
     
     if (!buffer || !audioContextRef.current) return;
     
-    // Ensure context is running
     if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
     }
@@ -310,22 +306,13 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
     sourceNode.start();
     sourceNodeRef.current = sourceNode;
 
-    // --- Synchronization Logic ---
+    startTimeRef.current = audioContextRef.current.currentTime;
     const words = pages[pageIndex].pageText.split(/\s+/).filter(Boolean);
     const bufferDuration = buffer.duration;
-    // Store the context time when we started
-    startTimeRef.current = audioContextRef.current.currentTime;
     
     const animate = () => {
         if (!audioContextRef.current || !sourceNodeRef.current) return;
 
-        // If paused via context suspension, currentTime doesn't advance, 
-        // so we don't need special logic for pause state here, 
-        // but we should only update if state is 'playing'.
-        
-        // Calculation:
-        // elapsedTime (wall clock relative to context) = ctx.currentTime - startTime
-        // audioConsumed = elapsedTime * speed
         const elapsedTime = audioContextRef.current.currentTime - startTimeRef.current;
         const audioConsumed = elapsedTime * speed;
         
@@ -343,7 +330,6 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
     animationFrameRef.current = requestAnimationFrame(animate);
 
     sourceNode.onended = () => {
-        // Only trigger stop if we didn't manually stop it (which sets source to null)
         if (sourceNodeRef.current === sourceNode) {
             hardStop();
         }
@@ -365,16 +351,11 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
       if (audioContextRef.current) {
           audioContextRef.current.resume();
           setPlaybackState('playing');
-          // Restart animation loop
           const animate = () => {
               if (!audioContextRef.current || !sourceNodeRef.current) return;
-              // Recalculate based on stored startTime (which is relative to context timeline)
-              // When suspended, context time paused, so existing math holds true.
               const elapsedTime = audioContextRef.current.currentTime - startTimeRef.current;
               const audioConsumed = elapsedTime * activeSpeed;
               
-              // Need access to buffer duration. Since we are in closure, might be tricky if we don't store it.
-              // But we can check the source's buffer
               const bufferDuration = sourceNodeRef.current.buffer?.duration || 0;
               const words = pages[activePageIndex!].pageText.split(/\s+/).filter(Boolean);
 
@@ -391,7 +372,6 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
       }
   }, [activePageIndex, activeSpeed, pages]);
 
-  // Stop audio when turning pages (changing spread)
   useEffect(() => {
     hardStop();
   }, [currentSpread, hardStop]);
@@ -420,6 +400,10 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
   const handleNext = () => setCurrentSpread(s => Math.min(s + 1, totalSpreads));
   const handlePrev = () => setCurrentSpread(s => Math.max(s - 1, 0));
   
+  const handlePrint = () => {
+      window.print();
+  };
+
   const getPageNumberText = () => {
     if (currentSpread === 0) return `Cover`;
     const leftPageNum = (currentSpread -1) * 2 + 2;
@@ -431,10 +415,51 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
 
   return (
     <div className="flex flex-col items-center w-full relative">
+      {/* Hidden Print Area */}
+      <div id="printable-area" className="hidden">
+        {storyTitle && (
+            <div className="text-center mb-8 break-after-avoid">
+                <h1 className="text-4xl font-bold text-slate-800">{storyTitle}</h1>
+            </div>
+        )}
+        
+        {/* Cover Page */}
+        {pages[0] && (
+            <div className="print-spread" style={{ pageBreakAfter: 'always', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', height: '100vh' }}>
+                 <div className="page-print cover-print" style={{ width: '90%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <img src={pages[0].imageUrl} className="max-h-[60vh] object-contain" alt="Cover" />
+                    <div className="mt-8 text-xl font-medium text-center">{pages[0].pageText}</div>
+                 </div>
+            </div>
+        )}
+
+        {/* Page Spreads */}
+        {papers.slice(1).map((spread, idx) => (
+            <div key={idx} className="print-spread" style={{ pageBreakAfter: 'always', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100vh', padding: '2rem' }}>
+                {/* Left Page */}
+                {spread.front && (
+                    <div className="page-print" style={{ width: '45%', display: 'flex', flexDirection: 'column', height: '90%' }}>
+                        <img src={spread.front.page.imageUrl} className="w-full h-[50%] object-cover mb-4" alt={`Page ${spread.front.pageIndex + 1}`} />
+                        <div className="text-lg">{spread.front.page.pageText}</div>
+                        <div className="mt-auto text-sm text-slate-500 text-center">{spread.front.pageIndex + 1}</div>
+                    </div>
+                )}
+                {/* Right Page */}
+                {spread.back && (
+                    <div className="page-print" style={{ width: '45%', display: 'flex', flexDirection: 'column', height: '90%' }}>
+                        <img src={spread.back.page.imageUrl} className="w-full h-[50%] object-cover mb-4" alt={`Page ${spread.back.pageIndex + 1}`} />
+                        <div className="text-lg">{spread.back.page.pageText}</div>
+                        <div className="mt-auto text-sm text-slate-500 text-center">{spread.back.pageIndex + 1}</div>
+                    </div>
+                )}
+            </div>
+        ))}
+      </div>
+
       {/* Back to Home Button - Absolute Top Left */}
       <button 
         onClick={onExit}
-        className="absolute top-[-3rem] left-0 sm:left-4 flex items-center gap-2 bg-white/80 hover:bg-white text-slate-700 hover:text-blue-600 px-4 py-2 rounded-full shadow-md transition-all font-bold z-50 backdrop-blur-sm"
+        className="absolute top-[-3rem] left-0 sm:left-4 flex items-center gap-2 bg-white/80 hover:bg-white text-slate-700 hover:text-blue-600 px-4 py-2 rounded-full shadow-md transition-all font-bold z-50 backdrop-blur-sm no-print"
       >
          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
@@ -491,7 +516,7 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
         </div>
       </div>
 
-      <div className="flex items-center justify-center space-x-4 md:space-x-8 mt-8 w-full">
+      <div className="flex items-center justify-center space-x-4 md:space-x-8 mt-8 w-full no-print">
         <button onClick={handlePrev} disabled={currentSpread === 0} className="nav-button">Prev</button>
         <div className="flex flex-col items-center">
             <span className="text-slate-600 font-semibold w-32 text-center">{getPageNumberText()}</span>
@@ -500,7 +525,7 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
       </div>
       
       {isAtEndInteraction && (
-        <div className="mt-8 w-full max-w-2xl">
+        <div className="mt-8 w-full max-w-2xl no-print">
            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl space-y-4 text-center animate-fade-in">
               <h2 className="text-3xl font-bold text-slate-800">The End!</h2>
               <p className="text-lg text-slate-600">What a wonderful adventure!</p>
@@ -513,6 +538,12 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
                           {isSaved ? 'Story Saved!' : 'Save This Adventure'}
                       </button>
                   )}
+                  <button 
+                    onClick={handlePrint} 
+                    className="bg-purple-600 text-white font-bold text-lg py-3 px-8 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-300 transform hover:scale-105 transition-all duration-300"
+                  >
+                    Save as PDF
+                  </button>
               </div>
             </div>
         </div>

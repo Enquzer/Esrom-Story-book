@@ -1,3 +1,4 @@
+
 export interface Page {
   pageText: string;
   imageUrl: string;
@@ -23,6 +24,8 @@ export interface SavedStoryPage {
     keyword: string;
     type: 'glow' | 'bounce' | 'shake' | 'spin' | 'float';
   };
+  imageUrl?: string;
+  audioData?: string | null;
 }
 
 

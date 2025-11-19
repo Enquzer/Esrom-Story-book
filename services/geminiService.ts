@@ -92,8 +92,9 @@ Page 3: "He chased the bug all the way to the magic forest." (Movement)
 `;
 
   try {
+    // Switched to gemini-2.5-flash for faster generation speed
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash',
       contents: [{ role: 'user', parts: [{ text: `Write a story about ${character.name} based on the prompt: ${storyPrompt}` }] }],
       config: {
         systemInstruction,
