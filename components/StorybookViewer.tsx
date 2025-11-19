@@ -44,32 +44,54 @@ interface PageContentProps {
   isLoadingAudio: boolean;
 }
 
-const renderInteractiveText = (page: Page, highlightedWordIndex: number, language: Language) => {
+const renderInteractiveText = (page: Page, highlightedWordIndex: number, language: Language, onPausePlayback: () => void) => {
   if (!page.pageText) return null;
 
   const words = page.pageText.split(/\s+/).filter(Boolean);
   const animatableKeyword = page.animation?.keyword?.toLowerCase();
 
+  const speakWord = (text: string) => {
+    // Pause the main story narration if it's running
+    onPausePlayback();
+
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel(); 
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language === 'am' ? 'am-ET' : 'en-US';
+    utterance.rate = 0.9; // Slightly slower for clarity
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
-    <p className={`text-slate-700 text-lg leading-relaxed ${language === 'am' ? 'font-amharic' : ''}`}>
+    <p className={`text-slate-700 text-lg leading-relaxed ${language === 'am' ? 'font-amharic' : ''} select-none`}>
       {words.map((word, index) => {
         const wordKey = `${index}-${word}`;
-        const cleanWord = word.replace(/[.,!?;:]/g, '').toLowerCase();
+        // Remove punctuation for cleaner matching/speaking, but keep display word
+        const cleanWord = word.replace(/[.,!?;:"'()]/g, '').toLowerCase();
         
         const isAnimatable = animatableKeyword && cleanWord === animatableKeyword;
         const isCurrentWord = index === highlightedWordIndex;
+
+        const handleDoubleClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            // Speak the clean version of the word
+            speakWord(cleanWord);
+        };
 
         if (isAnimatable && page.animation) {
           return (
             <span key={wordKey} className={`transition-colors duration-200 ${isCurrentWord ? 'bg-yellow-200 rounded' : ''}`}>
               <span
-                className={`interactive-word animate-${page.animation.type}`}
+                className={`interactive-word animate-${page.animation.type} cursor-pointer hover:text-blue-500`}
+                title="Double-click to hear"
                 onClick={(e) => {
                   const target = e.target as HTMLElement;
                   target.classList.remove('play-animation');
                   void target.offsetWidth; // Trigger reflow
                   target.classList.add('play-animation');
                 }}
+                onDoubleClick={handleDoubleClick}
                 onAnimationEnd={(e) => {
                   (e.target as HTMLElement).classList.remove('play-animation');
                 }}
@@ -81,7 +103,12 @@ const renderInteractiveText = (page: Page, highlightedWordIndex: number, languag
         }
 
         return (
-          <span key={wordKey} className={`transition-colors duration-200 ${isCurrentWord ? 'bg-yellow-200 rounded' : 'bg-transparent'}`}>
+          <span 
+            key={wordKey} 
+            className={`transition-colors duration-200 ${isCurrentWord ? 'bg-yellow-200 rounded' : 'bg-transparent'} cursor-pointer hover:text-blue-500 hover:bg-blue-50 rounded px-0.5`}
+            title="Double-click to hear"
+            onDoubleClick={handleDoubleClick}
+          >
             {word}{' '}
           </span>
         );
@@ -180,7 +207,7 @@ const PageContent: React.FC<PageContentProps> = React.memo(({
            </div>
            
            <div className="flex-grow">
-            {renderInteractiveText(page, highlightedWordIndex, language)}
+            {renderInteractiveText(page, highlightedWordIndex, language, onPause)}
            </div>
         </div>
       </div>
@@ -520,6 +547,7 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({ pages, pageAudio, lan
         <button onClick={handlePrev} disabled={currentSpread === 0} className="nav-button">Prev</button>
         <div className="flex flex-col items-center">
             <span className="text-slate-600 font-semibold w-32 text-center">{getPageNumberText()}</span>
+            <span className="text-xs text-slate-400 mt-1">(Double-click words to speak)</span>
         </div>
         <button onClick={handleNext} disabled={isAtEndInteraction} className="nav-button">Next</button>
       </div>
