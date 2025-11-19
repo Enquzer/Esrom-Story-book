@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Page, Character, Language, SavedStory, PageBlueprint, SavedStoryPage } from './types';
 import { generateFullStory, generateImage, generateSpeech, cartoonizeImage } from './services/geminiService';
@@ -139,7 +140,16 @@ function App() {
       setLoadingMessage("Dreaming up the story and styling your hero...");
       
       const storyPromise = generateFullStory(character, language, storyPrompt);
-      const cartoonPromise = characterImage ? cartoonizeImage(characterImage) : Promise.resolve(null);
+      
+      // Robust handling for cartoonize failure: 
+      // If cartoonizeImage fails (e.g., safety filter or network), we catch it here
+      // and return null so the story can still proceed without the reference image.
+      const cartoonPromise = characterImage 
+        ? cartoonizeImage(characterImage).catch(err => {
+            console.warn("Cartoonization failed, proceeding without reference image:", err);
+            return null;
+          }) 
+        : Promise.resolve(null);
 
       // Run both in parallel
       const [fullStory, cartoonImg] = await Promise.all([storyPromise, cartoonPromise]);
@@ -274,7 +284,13 @@ function App() {
       setLoadingMessage("Warming up the hero...");
       let cartoonImg = null;
       if (story.characterImage) {
-        cartoonImg = await cartoonizeImage(story.characterImage);
+        // Try to cartoonize, but tolerate failure on reload too
+        try {
+            cartoonImg = await cartoonizeImage(story.characterImage);
+        } catch (e) {
+            console.warn("Failed to re-cartoonize image on load:", e);
+            // Proceed without it
+        }
         setCartoonizedCharacterImage(cartoonImg);
       }
       

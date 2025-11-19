@@ -32,15 +32,60 @@ const StoryInput: React.FC<StoryInputProps> = ({
   onLoadSavedStory
 }) => {
   
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper to resize and compress images before setting state
+  const processImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_SIZE = 1024; // Resize to max 1024px to prevent massive payloads
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+             reject(new Error("Could not get canvas context"));
+             return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress to JPEG 0.8 to keep base64 string size reasonable
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCharacterImage(reader.result as string);
+      try {
+        const processedImage = await processImage(file);
+        setCharacterImage(processedImage);
         setCharacter({ ...character, appearance: 'Based on the uploaded picture' });
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Image processing failed", err);
+        alert("Sorry, we couldn't process that image. Please try a standard JPG or PNG.");
+      }
     }
   };
   
@@ -89,7 +134,7 @@ const StoryInput: React.FC<StoryInputProps> = ({
             <input
               id="image-upload"
               type="file"
-              accept="image/png, image/jpeg"
+              accept="image/png, image/jpeg, image/jpg"
               onChange={handleImageUpload}
               className="hidden"
               disabled={isLoading}
