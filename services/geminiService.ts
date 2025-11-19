@@ -22,11 +22,11 @@ const fullStorySchema = {
         properties: {
           pageText: {
             type: Type.STRING,
-            description: 'A short segment of the story text for a single page. Must be in the original story language, incorporate the main character\'s details, and be around 20 words.',
+            description: 'A short segment of the story text for a single page. Must be in the original story language. Do NOT repeat the character name/traits constantly. Move the plot forward.',
           },
           imagePrompt: {
             type: Type.STRING,
-            description: 'A vivid, descriptive prompt in English for an AI image generator to create a fun, colorful illustration for a young boy, featuring the main character based on their description.',
+            description: 'A vivid, descriptive prompt in English for an AI image generator. Describe the specific action happening in this scene.',
           },
           animation: {
             type: Type.OBJECT,
@@ -61,27 +61,40 @@ export async function generateFullStory(
 ): Promise<{ title: string; pages: PageBlueprint[] }> {
   const langName = language === 'am' ? 'Amharic' : 'English';
   
-  const systemInstruction = `You are a storyteller for a young boy (around 4-6 years old), creating a fun, complete adventure.
-**CRITICAL RULES:**
-1.  **Main Character:** The hero is **${character.name}**.
-2.  **Appearance:** They look like this: **${character.appearance}**.
-3.  **Special Trait:** Their unique ability is: **${character.trait}**.
-4.  **Story Topic:** The story should be about: **${storyPrompt}**.
-5.  **CONSISTENCY IS KEY:** You MUST maintain these character details in every part of the story text and every image prompt.
-6.  **Language:** The story text and title MUST be in **${langName}**. Image prompts MUST be in **English**.
-7.  **Story Structure:**
-    - Create a complete story with a clear beginning, middle, and a happy, satisfying end.
-    - The story MUST have between 8 and 10 pages.
-    - Each page's text MUST be very short, around 20 words maximum.
-    - Use very simple vocabulary and short sentences, suitable for a child who is just learning to read. Avoid scary or complex themes. The tone should be light and positive.
-8.  **Story Flow:** CRITICAL: Every page must be unique. Each page MUST be a distinct, sequential part of the story. DO NOT repeat scenes or text. The narrative must flow logically from one page to the next.
-9.  **Interactive Animation:** For each page, if you find a suitable action or descriptive word (like "jumped," "sparkled," "flew," "shivered," "spun"), add an 'animation' object. Pick only one word per page. If no word fits, do not add the animation object.
-10. **JSON ONLY:** Your entire response must be ONLY a valid JSON object matching the schema. No extra text or explanations.`;
+  const systemInstruction = `You are a master storyteller for young children (ages 4-6). You are writing a story about **${character.name}** (${character.appearance}, special trait: ${character.trait}).
+
+**STORY GOAL:**
+Write a coherent, linear story about: ${storyPrompt}.
+
+**CRITICAL RULES FOR LOGICAL FLOW:**
+1.  **Structure:** You MUST follow this specific arc:
+    *   **Page 1:** Introduction (Introduce the hero and the setting).
+    *   **Page 2-3:** The Problem (Something specific happens or a quest begins).
+    *   **Page 4-6:** The Adventure (They travel to a specific place or face a specific challenge).
+    *   **Page 7:** The Climax (The most exciting moment).
+    *   **Page 8-10:** The Happy Ending (Resolution and feelings).
+2.  **NO REPETITION:** 
+    *   Do NOT repeat the introduction on Page 2. 
+    *   Do NOT keep saying "This is a story about..." or listing the character's traits on every page. 
+    *   Assume the reader knows who the character is after Page 1. Use pronouns ("He", "She") or just the name.
+3.  **Continuity:** Page 2 must follow Page 1. Page 3 must follow Page 2. It is one continuous story, not random scenes.
+    *   **Bad:** Page 2: "Leo is a boy who likes cars." Page 3: "Leo is a boy who went to the park."
+    *   **Good:** Page 2: "Leo hopped into his red race car." Page 3: "He zoomed all the way to the big park."
+4.  **Language:** Write the story text and title in **${langName}**. Image prompts must be in **English**.
+5.  **Length:** 8 to 10 pages. Each page text must be short (approx 20 words). Simple sentences.
+6.  **Animation:** Pick one action word per page to animate if applicable.
+7.  **JSON ONLY:** Return only valid JSON matching the schema.
+
+**Example of Flow:**
+Page 1: "Leo sat in his garden looking at the sky."
+Page 2: "Suddenly, a glowing blue bug flew past his nose!" (Action, not description)
+Page 3: "He chased the bug all the way to the magic forest." (Movement)
+`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-pro',
-      contents: [{ role: 'user', parts: [{ text: `Write a story about ${character.name} who ${character.trait} and is on an adventure about ${storyPrompt}.` }] }],
+      contents: [{ role: 'user', parts: [{ text: `Write a story about ${character.name} based on the prompt: ${storyPrompt}` }] }],
       config: {
         systemInstruction,
         responseMimeType: "application/json",
