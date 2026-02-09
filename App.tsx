@@ -9,6 +9,8 @@ import SavedStories from './components/SavedStories';
 
 // --- Storage Service ---
 const STORAGE_KEY = 'ai_storybook_saved_stories';
+const QUOTA_LOCKOUT_KEY = 'gemini_quota_lockout_timestamp';
+const LOCKOUT_DURATION = 1000 * 60 * 60 * 12; // 12 hours
 
 function getSavedStories(): SavedStory[] {
   try {
@@ -119,6 +121,19 @@ function App() {
   // Initialize state directly from localStorage to prevent UI flicker
   const [savedStories, setSavedStories] = useState<SavedStory[]>(() => getSavedStories());
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [isQuotaExhausted, setIsQuotaExhausted] = useState(false);
+
+  useEffect(() => {
+    const lockoutTime = localStorage.getItem(QUOTA_LOCKOUT_KEY);
+    if (lockoutTime) {
+        const diff = Date.now() - parseInt(lockoutTime, 10);
+        if (diff < LOCKOUT_DURATION) {
+            setIsQuotaExhausted(true);
+        } else {
+            localStorage.removeItem(QUOTA_LOCKOUT_KEY); // Expired
+        }
+    }
+  }, []);
   
 
   const handleStartStory = useCallback(async () => {
@@ -144,9 +159,16 @@ function App() {
       // Robust handling for cartoonize failure: 
       // If cartoonizeImage fails (e.g., safety filter or network), we catch it here
       // and return null so the story can still proceed without the reference image.
-      const cartoonPromise = characterImage 
+      const cartoonPromise = (characterImage && !isQuotaExhausted)
         ? cartoonizeImage(characterImage).catch(err => {
-            console.warn("Cartoonization failed, proceeding without reference image:", err);
+            console.warn("Cartoonization failed:", err);
+            const errStr = JSON.stringify(err);
+            // Detect 429/Resource Exhausted
+            if (errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota')) {
+                setIsQuotaExhausted(true);
+                localStorage.setItem(QUOTA_LOCKOUT_KEY, Date.now().toString());
+                alert("Usage Limit Reached: The daily limit for custom character photos has been hit. \n\nDon't worry! We are continuing to generate your story with our standard colorful illustrations instead. You can try uploading a photo again tomorrow.");
+            }
             return null;
           }) 
         : Promise.resolve(null);
@@ -158,22 +180,38 @@ function App() {
       setStoryTitle(fullStory.title);
       setStoryBlueprints(fullStory.pages);
 
-      // PHASE 2: Parallel Image and Audio Generation
+      // PHASE 2: Parallel Audio Generation (Low quota usage) but Batched Image Generation (High quota usage)
       setLoadingMessage("Painting the pictures and recording the voice...");
       
-      // Prepare all promises
-      const imagePromises = fullStory.pages.map(p => generateImage(p.imagePrompt, cartoonImg));
       const audioPromises = fullStory.pages.map(p => generateSpeech(p.pageText));
+      
+      // BATCHED IMAGE GENERATION
+      // Processing all images at once hits rate limits (429 errors).
+      // We process them in batches of 3 to respect quotas while staying relatively fast.
+      const imageUrls = new Array(fullStory.pages.length);
+      const BATCH_SIZE = 3;
+      
+      for (let i = 0; i < fullStory.pages.length; i += BATCH_SIZE) {
+        const batch = fullStory.pages.slice(i, i + BATCH_SIZE);
+        const batchPromises = batch.map((p, idx) => {
+            const globalIndex = i + idx;
+            return generateImage(p.imagePrompt, cartoonImg)
+                .then(url => { imageUrls[globalIndex] = url; })
+                .catch(e => {
+                    console.error(`Failed to generate image for page ${globalIndex + 1}`, e);
+                    // Fallback image so story doesn't break completely
+                    imageUrls[globalIndex] = "https://placehold.co/600x400/e2e8f0/475569?text=Image+Generation+Failed"; 
+                });
+        });
+        // Wait for this batch to finish before starting the next
+        await Promise.all(batchPromises);
+      }
 
-      // Run images and audio batches in parallel
-      const [imageUrls, audioData] = await Promise.all([
-          Promise.all(imagePromises),
-          Promise.all(audioPromises)
-      ]);
+      const audioData = await Promise.all(audioPromises);
       
       const finalPages: Page[] = fullStory.pages.map((p, i) => ({
         pageText: p.pageText,
-        imageUrl: imageUrls[i],
+        imageUrl: imageUrls[i] || "https://placehold.co/600x400/e2e8f0/475569?text=No+Image", // Safety fallback
         animation: p.animation,
       }));
 
@@ -189,7 +227,7 @@ function App() {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [character, language, storyPrompt, characterImage]);
+  }, [character, language, storyPrompt, characterImage, isQuotaExhausted]);
   
   
   const handleExitToMenu = () => {
@@ -283,7 +321,7 @@ function App() {
     try {
       setLoadingMessage("Warming up the hero...");
       let cartoonImg = null;
-      if (story.characterImage) {
+      if (story.characterImage && !isQuotaExhausted) {
         // Try to cartoonize, but tolerate failure on reload too
         try {
             cartoonImg = await cartoonizeImage(story.characterImage);
@@ -310,9 +348,24 @@ function App() {
       } else {
           console.log("Regenerating assets...");
           setLoadingMessage("Redrawing all the pictures...");
-          const imagePromises = story.pages.map(p => generateImage(p.imagePrompt, cartoonImg));
-          imageUrls = await Promise.all(imagePromises);
-          // Saved stories without cache generate audio on-demand, so initialize with null
+          
+          // BATCHED REGENERATION for loaded stories too
+          const regeneratedImages = new Array(story.pages.length);
+          const BATCH_SIZE = 3;
+          for (let i = 0; i < story.pages.length; i += BATCH_SIZE) {
+             const batch = story.pages.slice(i, i + BATCH_SIZE);
+             const batchPromises = batch.map((p, idx) => {
+                 const globalIndex = i + idx;
+                 return generateImage(p.imagePrompt, cartoonImg)
+                    .then(url => { regeneratedImages[globalIndex] = url; })
+                    .catch(e => {
+                         console.error("Failed to regenerate image", e);
+                         regeneratedImages[globalIndex] = "https://placehold.co/600x400/e2e8f0/475569?text=Regeneration+Failed";
+                    });
+             });
+             await Promise.all(batchPromises);
+          }
+          imageUrls = regeneratedImages;
           audioData = story.pages.map(() => null);
       }
 
@@ -406,6 +459,7 @@ function App() {
                   isLoading={isLoading}
                   savedStories={savedStories}
                   onLoadSavedStory={handleLoadStory}
+                  isQuotaExhausted={isQuotaExhausted}
                 />
             )}
             {view === 'saved' && (
