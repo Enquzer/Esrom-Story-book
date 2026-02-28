@@ -2,10 +2,14 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Page, Character, Language, SavedStory, PageBlueprint, SavedStoryPage } from './types';
 import { generateFullStory, cartoonizeImage, getCredits } from './services/geminiService';
 import { translations } from './translations';
+import { saveStoryToSupabase, getUserStories, getStoryById } from './services/supabaseService';
+import { supabase } from './services/supabaseClient';
+import { User } from '@supabase/supabase-js';
 import StoryInput from './components/StoryInput';
 import StorybookViewer from './components/StorybookViewer';
 import Loader from './components/Loader';
 import SavedStories from './components/SavedStories';
+import Auth from './components/Auth';
 
 const STORAGE_KEY = 'ai_storybook_saved_stories';
 const QUOTA_LOCKOUT_KEY = 'gemini_quota_lockout_timestamp';
@@ -68,6 +72,7 @@ async function compressImage(base64: string, maxWidth = 800): Promise<string> {
 }
 
 function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'input' | 'storybook' | 'saved'>('input');
   const [character, setCharacter] = useState<Character>({ name: '', appearance: '', trait: '' });
   const [characterImage, setCharacterImage] = useState<string | null>(null);
@@ -88,6 +93,16 @@ function App() {
   const [isQuotaExhausted, setIsQuotaExhausted] = useState(false);
   const [withImages, setWithImages] = useState(true);
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const refreshCredits = useCallback(async () => {
     try {
@@ -158,18 +173,34 @@ function App() {
     setIsLoading(true);
     setError(null);
     setStoryTitle(story.title);
-    setLanguage(story.language);
-    setCharacter(story.character);
+    setLanguage(story.language || 'en');
+    setCharacter(story.character || { name: '', appearance: '', trait: '' });
     setView('storybook');
     setLoadingMessage(t.restoringJourney);
 
     try {
-      const pages = story.pages.map(p => ({ 
+      // Try to load from Supabase if it's a Supabase story
+      let pages = story.pages.map(p => ({ 
         pageText: p.pageText, 
         imageUrl: p.imageUrl || "https://placehold.co/600x400?text=Image+Not+Found", 
         animation: p.animation 
       }));
-      const audio = story.pages.map(p => p.audioData || null);
+      let audio = story.pages.map(p => p.audioData || null);
+
+      if (story.id && !story.id.includes('-')) {
+        // Local story
+      } else if (story.id) {
+        // Supabase story
+        const dbStory = await getStoryById(story.id);
+        if (dbStory && dbStory.pages) {
+          pages = dbStory.pages.map((p: any) => ({
+            pageText: p.content,
+            imageUrl: p.image_url || "https://placehold.co/600x400?text=Image+Not+Found",
+            animation: 'fade'
+          }));
+          audio = new Array(pages.length).fill(null);
+        }
+      }
 
       setStoryPages(pages);
       setStoryAudio(audio);
@@ -184,11 +215,40 @@ function App() {
     }
   };
 
+  const loadSavedStories = async () => {
+    try {
+      const localStories = getSavedStories();
+      if (user) {
+        const dbStories = await getUserStories();
+        const formattedDbStories: SavedStory[] = dbStories.map(s => ({
+          id: s.id,
+          createdAt: new Date(s.created_at).getTime(),
+          title: s.title,
+          character: { name: '', appearance: '', trait: '' },
+          characterImage: s.cover_url || null,
+          language: 'en',
+          pages: [] // Pages are loaded on demand
+        }));
+        setSavedStories([...formattedDbStories, ...localStories]);
+      } else {
+        setSavedStories(localStories);
+      }
+    } catch (e) {
+      console.error("Failed to load stories", e);
+      setSavedStories(getSavedStories());
+    }
+  };
+
+  useEffect(() => {
+    loadSavedStories();
+  }, [user]);
+
   const isHomeScreen = view === 'input' || view === 'saved';
   const t = translations[language];
 
   return (
     <>
+      {!user && <Auth />}
       <div id="space-container" aria-hidden="true">
         <div id="stars1" className="stars" />
         <div id="stars2" className="stars" />
@@ -245,18 +305,34 @@ function App() {
                 character={character}
                 characterImage={cartoonizedCharacterImage}
                 onSaveStory={async () => { 
-                  const compressedPages = await Promise.all(storyPages.map(async (p, i) => ({
-                    ...p,
-                    imageUrl: p.imageUrl ? await compressImage(p.imageUrl) : '',
-                    audioData: storyAudio[i]
-                  })));
-                  saveStoryToStorage({ 
-                    title: storyTitle, character, characterImage, 
-                    pages: compressedPages, 
-                    language 
-                  }); 
-                  setIsSaved(true); 
-                  setSavedStories(getSavedStories()); 
+                  try {
+                    setLoadingMessage("Saving to cloud...");
+                    setIsLoading(true);
+                    if (user) {
+                      await saveStoryToSupabase(storyTitle, character.trait || 'Adventure', storyPages, cartoonizedCharacterImage || undefined);
+                      alert("Story saved to cloud successfully!");
+                    } else {
+                      // Fallback to local storage
+                      const compressedPages = await Promise.all(storyPages.map(async (p, i) => ({
+                        ...p,
+                        imageUrl: p.imageUrl ? await compressImage(p.imageUrl) : '',
+                        audioData: storyAudio[i]
+                      })));
+                      saveStoryToStorage({ 
+                        title: storyTitle, character, characterImage, 
+                        pages: compressedPages, 
+                        language 
+                      }); 
+                      alert("Story saved locally!");
+                    }
+                    setIsSaved(true); 
+                    loadSavedStories();
+                  } catch (e: any) {
+                    console.error("Save error:", e);
+                    alert("Failed to save story: " + e.message);
+                  } finally {
+                    setIsLoading(false);
+                  }
                 }} 
                 language={language} isViewingSaved={isViewingSaved} 
                 isSaved={isSaved} storyTitle={storyTitle} 

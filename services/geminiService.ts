@@ -109,7 +109,7 @@ export async function cartoonizeImage(image: string): Promise<string> {
 }
 
 export async function generateImage(prompt: string, characterImage: string | null, email: string = 'guest'): Promise<string> {
-  await useCredits(2, email);
+  await useCredits(0.5, email);
 
   const parts: Part[] = [];
   if (characterImage) {
