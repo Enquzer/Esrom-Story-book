@@ -1,24 +1,29 @@
 
 import React from 'react';
-
-const RocketIcon = () => (
-  <svg className="w-16 h-16 text-blue-500 animate-bounce" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.82m5.84-2.56a6 6 0 01-5.84 7.38v-4.82m5.84-2.56a6 6 0 01-5.84 7.38v-4.82m-5.84 2.56a6 6 0 015.84-7.38m-5.84 7.38a6 6 0 015.84-7.38m0-11.25a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5a.75.75 0 01.75-.75z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 18.75c.273 0 .53.03.78.082m15.09 0c.25-.052.507-.082.78-.082s.528.03.78.082m-1.956 1.45a.75.75 0 01-.541-.261L15.39 18.2a1.5 1.5 0 00-2.628 0l-1.42 2.13a.75.75 0 01-.541.26z" />
-  </svg>
-);
+import { Language } from '../types';
+import { translations } from '../translations';
 
 interface LoaderProps {
   message: string;
+  language: Language;
 }
 
-const Loader: React.FC<LoaderProps> = ({ message }) => {
+const Loader: React.FC<LoaderProps> = ({ message, language }) => {
+  const t = translations[language];
   return (
-    <div className="flex flex-col items-center justify-center text-center p-8 bg-slate-50 rounded-lg shadow-lg">
-      <RocketIcon />
-      <h2 className="text-2xl font-bold text-slate-700 mt-6">Hang on tight!</h2>
-      <p className="text-lg text-slate-500 mt-2 transition-opacity duration-500">
-        {message || 'Building your adventure...'}
+    <div className="flex flex-col items-center justify-center text-center p-8 bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-blue-100 max-w-md w-full">
+      <div className="relative w-64 h-64 mb-6">
+        <img 
+          src="https://storage.googleapis.com/applet-assets/storyspark-logo.png" 
+          alt="StorySpark Logo" 
+          className="w-full h-full object-contain animate-pulse"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <h2 className="text-3xl font-extrabold text-blue-600 mb-2">{t.magicInProgress}</h2>
+      <p className="text-lg text-slate-600 font-medium">
+        {message || t.buildingAdventure}
       </p>
     </div>
   );

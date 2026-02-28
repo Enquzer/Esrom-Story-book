@@ -2,6 +2,7 @@
 export interface Page {
   pageText: string;
   imageUrl: string;
+  imagePrompt: string;
   animation?: {
     keyword: string;
     type: 'glow' | 'bounce' | 'shake' | 'spin' | 'float';
