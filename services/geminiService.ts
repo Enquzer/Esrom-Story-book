@@ -3,9 +3,26 @@ import { PageBlueprint, Character, Language } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
+async function wrapSDKCall<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (e: any) {
+    const isQuota = e.message?.includes('429') || e.status === 429 || e.code === 429;
+    const isServiceUnavailable = e.message?.includes('503') || e.status === 503 || e.code === 503 || e.message?.includes('high demand');
+    
+    if (isQuota || isServiceUnavailable) {
+      throw new Error("QUOTA_EXHAUSTED");
+    }
+    throw e;
+  }
+}
+
 const API_BASE = '/api';
 
 async function handleResponse(response: Response) {
+  if (response.status === 429) {
+    throw new Error("QUOTA_EXHAUSTED");
+  }
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || `API error: ${response.status}`);
@@ -66,21 +83,21 @@ export async function generateFullStory(
     required: ['title', 'pages'],
   };
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+  const response = await wrapSDKCall(() => ai.models.generateContent({
+    model: 'gemini-3-flash-preview', 
     contents: [{ role: 'user', parts: [{ text: `Write a story about ${character.name} based on: ${storyPrompt}` }] }],
     config: {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema: fullStorySchema,
     },
-  });
+  })) as any;
 
   return JSON.parse(response.text.trim());
 }
 
 export async function generateSpeech(text: string): Promise<string> {
-  const response = await ai.models.generateContent({
+  const response = await wrapSDKCall(() => ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text }] }],
     config: {
@@ -89,21 +106,21 @@ export async function generateSpeech(text: string): Promise<string> {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
       },
     },
-  });
+  })) as any;
   return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
 }
 
 export async function cartoonizeImage(image: string): Promise<string> {
   const mimeType = image.substring(5, image.indexOf(';'));
   const data = image.substring(image.indexOf(',') + 1);
-  const response = await ai.models.generateContent({
+  const response = await wrapSDKCall(() => ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
       parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }],
     },
     config: { responseModalities: [Modality.IMAGE] },
-  });
-  const part = response.candidates[0].content.parts.find(p => p.inlineData);
+  })) as any;
+  const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
   if (!part) throw new Error("No image generated");
   return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
 }
@@ -121,16 +138,16 @@ export async function generateImage(prompt: string, characterImage: string | nul
     parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
   }
 
-  const response = await ai.models.generateContent({
+  const response = await wrapSDKCall(() => ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: { parts },
     config: { 
       responseModalities: [Modality.IMAGE],
       imageConfig: { aspectRatio: "4:3" }
     },
-  });
+  })) as any;
 
-  const part = response.candidates[0].content.parts.find(p => p.inlineData);
+  const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
   if (!part) throw new Error("No image data");
   return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
 }

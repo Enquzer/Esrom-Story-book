@@ -3,12 +3,16 @@ import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.static("public"));
 
 // --- Simple Persistence Layer ---
 const DATA_DIR = path.resolve("./data");
@@ -20,7 +24,9 @@ function getCredits() {
   if (!fs.existsSync(CREDITS_FILE)) return {};
   try {
     return JSON.parse(fs.readFileSync(CREDITS_FILE, "utf-8"));
-  } catch (e) { return {}; }
+  } catch (e) {
+    return {};
+  }
 }
 
 function saveCredits(credits: any) {
@@ -48,7 +54,7 @@ app.post("/api/credits/use", (req, res) => {
   const { email = "guest", amount = 1 } = req.body;
   const credits = getCredits();
   const userCredits = getUserCredits(email);
-  
+
   if (userCredits.amount >= amount) {
     credits[email].amount -= amount;
     saveCredits(credits);

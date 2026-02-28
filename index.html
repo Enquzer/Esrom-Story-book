@@ -1,23 +1,27 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="https://storage.googleapis.com/applet-assets/storyspark-logo.png" />
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Storybook Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;700&family=Baloo+2:wght@400;700;800&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;700&family=Baloo+2:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
     <style>
       body {
-        font-family: 'Baloo 2', cursive;
+        font-family: "Baloo 2", cursive;
       }
       .font-amharic {
-        font-family: 'Noto Sans Ethiopic', sans-serif;
+        font-family: "Noto Sans Ethiopic", sans-serif;
       }
-      
+
       /* New background animation styles - Code-based */
       #space-container {
         position: fixed;
@@ -25,14 +29,22 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        background: radial-gradient(
+          ellipse at bottom,
+          #1b2735 0%,
+          #090a0f 100%
+        );
         overflow: hidden;
         z-index: 0;
       }
 
       @keyframes animate-stars {
-        from { transform: translateY(0); }
-        to { transform: translateY(-2000px); }
+        from {
+          transform: translateY(0);
+        }
+        to {
+          transform: translateY(-2000px);
+        }
       }
 
       .stars {
@@ -63,27 +75,83 @@
         height: 1px;
         animation-duration: 150s;
         /* 25 Small stars */
-        box-shadow: 624px 1726px #FFF, 479px 134px #FFF, 1445px 338px #FFF, 792px 1391px #FFF, 1280px 1581px #FFF, 153px 439px #FFF, 883px 145px #FFF, 44px 1269px #FFF, 343px 1868px #FFF, 1374px 1195px #FFF, 1858px 57px #FFF, 1933px 184px #FFF, 825px 321px #FFF, 943px 1300px #FFF, 25px 982px #FFF, 1735px 441px #FFF, 149px 141px #FFF, 1029px 1109px #FFF, 1968px 1827px #FFF, 1372px 697px #FFF, 1365px 1974px #FFF, 126px 1238px #FFF, 431px 1916px #FFF, 1104px 182px #FFF, 1720px 840px #FFF;
+        box-shadow:
+          624px 1726px #fff,
+          479px 134px #fff,
+          1445px 338px #fff,
+          792px 1391px #fff,
+          1280px 1581px #fff,
+          153px 439px #fff,
+          883px 145px #fff,
+          44px 1269px #fff,
+          343px 1868px #fff,
+          1374px 1195px #fff,
+          1858px 57px #fff,
+          1933px 184px #fff,
+          825px 321px #fff,
+          943px 1300px #fff,
+          25px 982px #fff,
+          1735px 441px #fff,
+          149px 141px #fff,
+          1029px 1109px #fff,
+          1968px 1827px #fff,
+          1372px 697px #fff,
+          1365px 1974px #fff,
+          126px 1238px #fff,
+          431px 1916px #fff,
+          1104px 182px #fff,
+          1720px 840px #fff;
       }
       #stars2 {
         width: 2px;
         height: 2px;
         animation-duration: 100s;
         /* 15 Medium stars */
-        box-shadow: 1827px 1113px #FFF, 1228px 1014px #FFF, 495px 1492px #FFF, 248px 173px #FFF, 1437px 1324px #FFF, 506px 1485px #FFF, 1161px 649px #FFF, 1262px 1742px #FFF, 1166px 1974px #FFF, 102px 1499px #FFF, 1308px 233px #FFF, 1194px 1508px #FFF, 1832px 352px #FFF, 97px 670px #FFF, 622px 1865px #FFF;
+        box-shadow:
+          1827px 1113px #fff,
+          1228px 1014px #fff,
+          495px 1492px #fff,
+          248px 173px #fff,
+          1437px 1324px #fff,
+          506px 1485px #fff,
+          1161px 649px #fff,
+          1262px 1742px #fff,
+          1166px 1974px #fff,
+          102px 1499px #fff,
+          1308px 233px #fff,
+          1194px 1508px #fff,
+          1832px 352px #fff,
+          97px 670px #fff,
+          622px 1865px #fff;
       }
       #stars3 {
         width: 3px;
         height: 3px;
         animation-duration: 50s;
         /* 10 Large stars */
-        box-shadow: 1008px 633px #FFF, 1729px 1292px #FFF, 107px 1486px #FFF, 102px 903px #FFF, 1004px 1650px #FFF, 117px 78px #FFF, 1858px 1459px #FFF, 1832px 1819px #FFF, 1698px 1313px #FFF, 1338px 1030px #FFF;
+        box-shadow:
+          1008px 633px #fff,
+          1729px 1292px #fff,
+          107px 1486px #fff,
+          102px 903px #fff,
+          1004px 1650px #fff,
+          117px 78px #fff,
+          1858px 1459px #fff,
+          1832px 1819px #fff,
+          1698px 1313px #fff,
+          1338px 1030px #fff;
       }
 
       @keyframes fly {
-        0% { transform: translateY(20px) translateX(-20px) rotate(-5deg); }
-        50% { transform: translateY(-20px) translateX(20px) rotate(5deg); }
-        100% { transform: translateY(20px) translateX(-20px) rotate(-5deg); }
+        0% {
+          transform: translateY(20px) translateX(-20px) rotate(-5deg);
+        }
+        50% {
+          transform: translateY(-20px) translateX(20px) rotate(5deg);
+        }
+        100% {
+          transform: translateY(20px) translateX(-20px) rotate(-5deg);
+        }
       }
       .spaceship {
         animation: fly 8s ease-in-out infinite;
@@ -114,7 +182,7 @@
         position: relative;
         transform-style: preserve-3d;
       }
-      
+
       .paper {
         position: absolute;
         width: 50%;
@@ -122,11 +190,11 @@
         top: 0;
         right: 0;
         transform-origin: left center;
-        transition: transform 1.5s cubic-bezier(0.645, 0.045, 0.355, 1);
         transform-style: preserve-3d;
         border-radius: 0 8px 8px 0;
+        /* Transition removed to favor high-fidelity JS physics */
       }
-      
+
       .paper.flipped {
         transform: rotateY(-180deg);
       }
@@ -143,18 +211,18 @@
         backface-visibility: hidden;
         overflow: hidden;
       }
-      
+
       .front {
         border-radius: 0 8px 8px 0;
-        box-shadow: inset -3px 0px 10px -7px rgba(0,0,0,0.3);
+        box-shadow: inset -3px 0px 10px -7px rgba(0, 0, 0, 0.3);
       }
-      
+
       .back {
         transform: rotateY(180deg);
         border-radius: 8px 0 0 8px;
-        box-shadow: inset 3px 0px 10px -7px rgba(0,0,0,0.3);
+        box-shadow: inset 3px 0px 10px -7px rgba(0, 0, 0, 0.3);
       }
-      
+
       .back-cover {
         position: absolute;
         width: 50%;
@@ -165,7 +233,7 @@
         border: 1px solid #e2e8f0;
         border-radius: 8px 0 0 8px;
       }
-      
+
       .nav-button {
         background-color: #2563eb; /* blue-600 */
         color: white;
@@ -173,7 +241,7 @@
         padding: 0.75rem 2rem;
         border-radius: 8px;
         transition: all 0.3s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
       .nav-button:hover {
         background-color: #1d4ed8; /* blue-700 */
@@ -188,26 +256,70 @@
 
       /* === INTERACTIVE ANIMATIONS === */
       @keyframes glow {
-        0%, 100% { text-shadow: 0 0 3px #fde047, 0 0 6px #facc15; color: #ca8a04; }
-        50% { text-shadow: 0 0 8px #fde047, 0 0 12px #facc15; color: #f59e0b; }
+        0%,
+        100% {
+          text-shadow:
+            0 0 3px #fde047,
+            0 0 6px #facc15;
+          color: #ca8a04;
+        }
+        50% {
+          text-shadow:
+            0 0 8px #fde047,
+            0 0 12px #facc15;
+          color: #f59e0b;
+        }
       }
       @keyframes bounce {
-        0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-        40% { transform: translateY(-10px); }
-        60% { transform: translateY(-5px); }
+        0%,
+        20%,
+        50%,
+        80%,
+        100% {
+          transform: translateY(0);
+        }
+        40% {
+          transform: translateY(-10px);
+        }
+        60% {
+          transform: translateY(-5px);
+        }
       }
       @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
-        20%, 40%, 60%, 80% { transform: translateX(3px); }
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        10%,
+        30%,
+        50%,
+        70%,
+        90% {
+          transform: translateX(-3px);
+        }
+        20%,
+        40%,
+        60%,
+        80% {
+          transform: translateX(3px);
+        }
       }
       @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
       }
       @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-8px); }
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
       }
 
       .interactive-word {
@@ -228,11 +340,26 @@
         animation-play-state: running !important;
       }
 
-      .animate-glow { --animation-name: glow; animation-name: glow; }
-      .animate-bounce { --animation-name: bounce; animation-name: bounce; }
-      .animate-shake { --animation-name: shake; animation-name: shake; }
-      .animate-spin { --animation-name: spin; animation-name: spin; }
-      .animate-float { --animation-name: float; animation-name: float; }
+      .animate-glow {
+        --animation-name: glow;
+        animation-name: glow;
+      }
+      .animate-bounce {
+        --animation-name: bounce;
+        animation-name: bounce;
+      }
+      .animate-shake {
+        --animation-name: shake;
+        animation-name: shake;
+      }
+      .animate-spin {
+        --animation-name: spin;
+        animation-name: spin;
+      }
+      .animate-float {
+        --animation-name: float;
+        animation-name: float;
+      }
 
       /* Print styles */
       @media print {
@@ -257,7 +384,11 @@
         #printable-area * {
           visibility: visible;
         }
-        .no-print, #space-container, .spaceship, .book-container, .nav-button {
+        .no-print,
+        #space-container,
+        .spaceship,
+        .book-container,
+        .nav-button {
           display: none !important;
         }
         .print-spread {
@@ -290,7 +421,7 @@
           object-fit: contain;
           border-radius: 1rem;
           margin-bottom: 1.5rem;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         .page-print p {
           font-size: 1.5rem;
@@ -305,18 +436,18 @@
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://aistudiocdn.com/react@^19.2.0",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+          "react/": "https://aistudiocdn.com/react@^19.2.0/",
+          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

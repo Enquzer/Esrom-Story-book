@@ -5,11 +5,12 @@ import { translations } from './translations';
 import { saveStoryToSupabase, getUserStories, getStoryById } from './services/supabaseService';
 import { supabase } from './services/supabaseClient';
 import { User } from '@supabase/supabase-js';
+import Auth from './components/Auth';
+import SpaceshipGame from './components/SpaceshipGame';
 import StoryInput from './components/StoryInput';
 import StorybookViewer from './components/StorybookViewer';
 import Loader from './components/Loader';
 import SavedStories from './components/SavedStories';
-import Auth from './components/Auth';
 
 const STORAGE_KEY = 'ai_storybook_saved_stories';
 const QUOTA_LOCKOUT_KEY = 'gemini_quota_lockout_timestamp';
@@ -91,8 +92,10 @@ function App() {
   const [savedStories, setSavedStories] = useState<SavedStory[]>(() => getSavedStories());
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isQuotaExhausted, setIsQuotaExhausted] = useState(false);
+  const [isGeminiQuotaExhausted, setIsGeminiQuotaExhausted] = useState(false);
   const [withImages, setWithImages] = useState(true);
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
+  const [showGame, setShowGame] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -155,7 +158,12 @@ function App() {
       refreshCredits();
     } catch (e: any) {
       console.error("Critical story error:", e);
-      setError(e.message || t.magicSlow);
+      if (e.message === 'QUOTA_EXHAUSTED' || e.message?.includes('429') || e.message?.includes('503')) {
+        setIsGeminiQuotaExhausted(true);
+        setError("You've reached your daily magic limit for today! Please try again tomorrow, or wait a few moments if it's just a busy spike.");
+      } else {
+        setError(e.message || t.magicSlow);
+      }
       setView('input');
     } finally {
       setIsLoading(false);
@@ -246,9 +254,12 @@ function App() {
   const isHomeScreen = view === 'input' || view === 'saved';
   const t = translations[language];
 
+  if (!user) {
+    return <Auth />;
+  }
+
   return (
     <>
-      {!user && <Auth />}
       <div id="space-container" aria-hidden="true">
         <div id="stars1" className="stars" />
         <div id="stars2" className="stars" />
@@ -259,11 +270,19 @@ function App() {
         <header className="text-center mb-8 flex flex-col items-center no-print">
           <div className="w-full max-w-lg mb-4 drop-shadow-2xl">
             <img 
-              src="https://storage.googleapis.com/applet-assets/storyspark-logo.png" 
+              src="/logo.png" 
               alt="StorySpark Logo" 
               className="w-full h-auto object-contain"
-              referrerPolicy="no-referrer"
             />
+            
+            {/* Background elements for the welcome screen */}
+            {isHomeScreen && (
+              <div className="absolute inset-0 -z-10 pointer-events-none opacity-40">
+                <div id="planet1" className="absolute top-10 right-10 w-24 h-24 bg-linear-to-br from-orange-400 to-red-600 rounded-full blur-[1px] shadow-lg animate-pulse" />
+                <div id="planet2" className="absolute bottom-20 left-20 w-16 h-16 bg-linear-to-br from-blue-400 to-indigo-600 rounded-full blur-[1px]" />
+                <div id="planet3" className="absolute top-1/2 left-10 w-32 h-32 bg-linear-to-br from-green-300 to-teal-500 rounded-full blur-[1px] opacity-20" />
+              </div>
+            )}
           </div>
           {isHomeScreen && (
             <div className="mt-4 flex flex-col items-center gap-4">
@@ -274,7 +293,13 @@ function App() {
               )}
               <div className="flex justify-center gap-4">
                 <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition-all">
-                  {view === 'input' ? `📂 ${t.library}` : `✍️ ${t.create}`}
+                  {view === 'input' ? `📚 ${t.library}` : `✍️ ${t.create}`}
+                </button>
+                <button 
+                  onClick={() => supabase.auth.signOut()} 
+                  className="bg-red-500/20 backdrop-blur-md border border-red-500/30 text-white font-bold py-2 px-6 rounded-full hover:bg-red-500/40 transition-all"
+                >
+                  🚪 Logout
                 </button>
               </div>
             </div>
@@ -282,7 +307,41 @@ function App() {
         </header>
 
         <main className="container mx-auto max-w-6xl">
-          {error && <div className="bg-red-500 text-white p-4 rounded-xl mb-6 font-bold shadow-lg animate-bounce no-print">{error}</div>}
+          {/* Custom Quota Exhausted Popup */}
+          {error && (error.includes('magic limit') || error.includes('quota')) ? (
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                <div className="bg-white p-8 rounded-[40px] shadow-2xl max-w-md w-full text-center border-4 border-blue-100 animate-in zoom-in duration-300">
+                    <div className="text-6xl mb-4">🚀</div>
+                    <h2 className="text-2xl font-black text-slate-800 mb-2">{t.magicLimitReached}</h2>
+                    <p className="text-slate-600 mb-8">{error}</p>
+                    
+                    <div className="flex flex-col gap-3">
+                        <button 
+                            onClick={() => { setError(null); setView('saved'); }}
+                            className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg"
+                        >
+                            📚 {t.library}
+                        </button>
+                        <button 
+                            onClick={() => { setShowGame(true); setError(null); }}
+                            className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg"
+                        >
+                            🎮 {t.playGame}
+                        </button>
+                        <button 
+                            onClick={() => setError(null)}
+                            className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl hover:bg-slate-200 transition-all"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+          ) : error ? (
+            <div className="bg-red-500 text-white p-4 rounded-xl mb-6 font-bold shadow-lg animate-bounce no-print">{error}</div>
+          ) : null}
+          
+          {showGame && <SpaceshipGame onBack={() => setShowGame(false)} language={language} />}
           <div className="flex justify-center">
             {view === 'input' && (
               <StoryInput 
@@ -292,11 +351,20 @@ function App() {
                 storyPrompt={storyPrompt} setStoryPrompt={setStoryPrompt} 
                 onSubmit={handleStartStory} isLoading={isLoading} 
                 savedStories={savedStories} onLoadSavedStory={handleLoadStory} 
-                isQuotaExhausted={isQuotaExhausted}
+                isQuotaExhausted={isQuotaExhausted || isGeminiQuotaExhausted}
                 withImages={withImages} setWithImages={setWithImages}
+                onPlayGame={() => setShowGame(true)}
               />
             )}
-            {view === 'saved' && <SavedStories stories={savedStories} onLoad={handleLoadStory} onDelete={(id) => { deleteStoryFromStorage(id); setSavedStories(getSavedStories()); }} language={language} />}
+            {view === 'saved' && (
+              <SavedStories 
+                stories={savedStories} 
+                onLoad={handleLoadStory} 
+                onDelete={(id) => { deleteStoryFromStorage(id); setSavedStories(getSavedStories()); }} 
+                language={language}
+                onHome={() => setView('input')}
+              />
+            )}
             {view === 'storybook' && isLoading && <Loader message={loadingMessage} language={language} />}
             {view === 'storybook' && !isLoading && storyPages.length > 0 && storyId && (
               <StorybookViewer 
