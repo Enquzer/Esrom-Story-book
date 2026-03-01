@@ -251,7 +251,7 @@ app.post("/api/generate-story", async (req, res) => {
 
     const result = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash-latest",
+        model: "gemini-1.5-flash",
         contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
         config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema as any },
       })
@@ -329,7 +329,7 @@ app.post("/api/generate-phase-1", async (req, res) => {
     // Step 1: Generate story text (fast, ~2-3s)
     const textResult = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash-latest",
+        model: "gemini-1.5-flash",
         contents: [{ role: "user", parts: [{ text: `Write a 6-page story about ${character?.name} based on: ${storyPrompt}` }] }],
         config: { systemInstruction, responseMimeType: "application/json", responseSchema: storySchema as any },
       })
@@ -404,7 +404,7 @@ app.post("/api/generate-speech", async (req, res) => {
     const { text } = req.body;
     const response = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash-latest",
+        model: "gemini-1.5-flash",
         contents: [{ role: "user", parts: [{ text }] }],
         config: {
           responseModalities: ["AUDIO"] as any,
