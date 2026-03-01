@@ -66,8 +66,9 @@ export const translations = {
     spikyHair: "e.g., Spiky red hair and a blue cape",
     talkToAnimals: "e.g., Can talk to animals",
     robotPrompt: "e.g., A friendly robot who wants to find the magical singing flower...",
-    playGame: "Play Spaceship Game",
-    returnToEarth: "Return to Earth",
+    playSpaceship: "Play Spaceship Game",
+    playBasketball: "Play Basketball Game",
+    playProtect: "Play Protect Game",
     magicLimitReached: "Daily Magic Limit Reached"
   },
   am: {
@@ -136,8 +137,9 @@ export const translations = {
     spikyHair: "ለምሳሌ፡ ቀይ ፀጉር እና ሰማያዊ ካባ ያለው",
     talkToAnimals: "ለምሳሌ፡ ከእንስሳት ጋር መነጋገር የሚችል",
     robotPrompt: "ለምሳሌ፡ አስማታዊውን ዘፋኝ አበባ ለማግኘት የሚፈልግ ደግ ሮቦት...",
-    playGame: "የጠፈር መርከብ ጨዋታ ተጫወት",
-    returnToEarth: "ወደ መሬት ተመለስ",
+    playSpaceship: "የጠፈር መርከብ ጨዋታ ተጫወት",
+    playBasketball: "ቅርጫት ኳስ ተጫወት",
+    playProtect: "የመከላከያ ጨዋታ ተጫወት",
     magicLimitReached: "የእለቱ አስማት ገደብ ተደርሷል"
   }
 };

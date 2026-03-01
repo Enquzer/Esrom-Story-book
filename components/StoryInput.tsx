@@ -19,7 +19,9 @@ interface StoryInputProps {
   setWithImages: (val: boolean) => void;
   savedStories?: SavedStory[];
   onLoadSavedStory?: (story: SavedStory) => void;
-  onPlayGame?: () => void;
+  onPlaySpaceship?: () => void;
+  onPlayBasketball?: () => void;
+  onPlayProtect?: () => void;
 }
 
 const StoryInput: React.FC<StoryInputProps> = ({ 
@@ -38,7 +40,9 @@ const StoryInput: React.FC<StoryInputProps> = ({
   setWithImages,
   savedStories,
   onLoadSavedStory,
-  onPlayGame
+  onPlaySpaceship,
+  onPlayBasketball,
+  onPlayProtect
 }) => {
   
   const processImage = (file: File): Promise<string> => {
@@ -121,12 +125,26 @@ const StoryInput: React.FC<StoryInputProps> = ({
         <p className="text-blue-700 text-sm font-medium">
           Generating text-only stories is recommended today.
         </p>
-        <button 
-          onClick={onPlayGame}
-          className="bg-indigo-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
-        >
-          <span>🎮</span> Play Spaceship Game
-        </button>
+        <div className="flex flex-wrap justify-center gap-3">
+          <button 
+            onClick={onPlaySpaceship}
+            className="bg-indigo-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
+          >
+            <span>🚀</span> {t.playSpaceship}
+          </button>
+          <button 
+            onClick={onPlayBasketball}
+            className="bg-orange-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-orange-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
+          >
+            <span>🏀</span> {t.playBasketball}
+          </button>
+          <button 
+            onClick={onPlayProtect}
+            className="bg-emerald-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-emerald-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
+          >
+            <span>🛡️</span> {t.playProtect}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">

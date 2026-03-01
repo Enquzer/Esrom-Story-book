@@ -33,6 +33,7 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
     if (!ctx) return;
 
     let animationFrameId: number;
+    let localGameOver = false; // local flag to avoid React stale-closure freeze
     let frameCount = 0;
     let planets: any[] = [];
     let enemies: any[] = [];
@@ -141,7 +142,7 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
     };
 
     const update = () => {
-      if (gameOver) return;
+      if (localGameOver) return;
 
       frameCount++;
       if (invincibilityFrames > 0) invincibilityFrames--;
@@ -157,7 +158,7 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
       if ((keys['ArrowDown'] || keys['s']) && player.y < targetY) player.y += player.speed;
       
       if (player.y > targetY) player.y -= 1; 
-      if (player.y < 40) setGameOver(true); 
+      if (player.y < 40) { localGameOver = true; setGameOver(true); }
 
       if ((keys['ArrowLeft'] || keys['a']) && player.x > 0) player.x -= player.speed;
       if ((keys['ArrowRight'] || keys['d']) && player.x < canvas.width - player.width) player.x += player.speed;
@@ -281,7 +282,7 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
 
         if (invincibilityFrames === 0 && player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
           setLives(l => {
-            if (l <= 1) { setGameOver(true); return 0; }
+            if (l <= 1) { localGameOver = true; setGameOver(true); return 0; }
             invincibilityFrames = 120;
             screenShake = 15;
             return l - 1;
@@ -465,20 +466,20 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
 
       if (player.weaponType !== 'single' && player.weaponTimer > 0) {
           const barWidth = 100; const bx = canvas.width - barWidth - 20; const by = 80;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.beginPath(); ctx.roundRect(bx, by, barWidth, 6, 4); ctx.fill();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.fillRect(bx, by, barWidth, 6);
           const colors: any = { double: '#00f5d4', triple: '#fee440', fire: '#fb5607' };
           ctx.fillStyle = colors[player.weaponType] || '#fff'; ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
-          ctx.beginPath(); ctx.roundRect(bx, by, barWidth * (player.weaponTimer / 600), 6, 4); ctx.fill(); ctx.shadowBlur = 0;
+          ctx.fillRect(bx, by, barWidth * (player.weaponTimer / 600), 6); ctx.shadowBlur = 0;
           ctx.font = 'bold 9px Arial'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
           ctx.fillText(`${player.weaponType.toUpperCase()} ACTIVE`, bx + barWidth, by - 6);
       }
 
       const chargeWidth = 120; const cbx = 20; const cby = canvas.height - 20;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.beginPath(); ctx.roundRect(cbx, cby, chargeWidth, 10, 5); ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.fillRect(cbx, cby, chargeWidth, 10);
       const chargeGrad = ctx.createLinearGradient(cbx, 0, cbx + chargeWidth, 0); chargeGrad.addColorStop(0, '#00f5d4'); chargeGrad.addColorStop(1, '#0ea5e9');
       ctx.fillStyle = chargeGrad;
       if (charge >= 100) { ctx.shadowBlur = 15; ctx.shadowColor = '#00f5d4'; if (frames % 10 < 5) ctx.fillStyle = 'white'; }
-      ctx.beginPath(); ctx.roundRect(cbx, cby, (chargeWidth * charge) / 100, 10, 5); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillRect(cbx, cby, (chargeWidth * charge) / 100, 10); ctx.shadowBlur = 0;
       ctx.font = 'bold 10px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = 'white';
       ctx.fillText(charge >= 100 ? "READY! (ENTER)" : `ULTIMATE: ${Math.floor(charge)}%`, cbx, cby - 8);
 
@@ -486,7 +487,10 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
       ctx.restore();
     };
 
-    const gameLoop = () => { update(); animationFrameId = requestAnimationFrame(gameLoop); };
+    const gameLoop = () => {
+      try { update(); } catch(e) { console.error('Spaceship loop error:', e); }
+      animationFrameId = requestAnimationFrame(gameLoop);
+    };
     gameLoop();
     return () => { 
         window.removeEventListener('keydown', handleKeyDown); 
@@ -496,7 +500,7 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
         canvas.removeEventListener('touchend', handleTouchEnd);
         cancelAnimationFrame(animationFrameId); 
     };
-  }, [gameOver, isMobile]);
+  }, [isMobile]);
 
   useEffect(() => {
     if (gameOver && score > highScore) { setHighScore(score); localStorage.setItem('spaceship_highscore', score.toString()); }
