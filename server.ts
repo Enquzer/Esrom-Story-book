@@ -109,21 +109,19 @@ app.post("/api/generate-story", async (req, res) => {
       required: ["title", "pages"],
     };
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: systemInstruction 
-    });
-
     console.log("Generating story with prompt:", storyPrompt);
-    const result = await model.generateContent({
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
-      generationConfig: { 
+      config: { 
+        systemInstruction,
         responseMimeType: "application/json", 
-        responseSchema: fullStorySchema 
+        responseSchema: fullStorySchema as any
       },
     });
 
-    const text = result.response.text();
+    const text = result.text;
+    if (!text) throw new Error("No text returned from Gemini");
     console.log("Gemini Response received");
 
     // Deduct credit only on success
@@ -134,9 +132,7 @@ app.post("/api/generate-story", async (req, res) => {
     res.json(JSON.parse(text));
   } catch (error: any) {
     console.error("Gemini generate-story DETAIL:", error);
-    if (error.response?.promptFeedback) console.error("Feedback:", error.response.promptFeedback);
-    const status = error.status === 429 || error.code === 429 ? 429 : 500;
-    res.status(status).json({ error: "Failed to generate story: " + (error.message || "Unknown error") });
+    res.status(500).json({ error: "Failed to generate story: " + (error.message || "AI engine error") });
   }
 });
 
@@ -144,15 +140,15 @@ app.post("/api/generate-story", async (req, res) => {
 app.post("/api/generate-speech", async (req, res) => {
   try {
     const { text } = req.body;
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ text }] }],
-      generationConfig: {
+      config: {
         responseModalities: [Modality.AUDIO] as any,
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } as any,
       },
     });
-    const audioData = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
     res.json({ audioData });
   } catch (error: any) {
     console.error("Gemini generate-speech error:", error);
@@ -166,12 +162,12 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const { image } = req.body;
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] }],
-      generationConfig: { responseModalities: [Modality.IMAGE] as any },
+      config: { responseModalities: [Modality.IMAGE] as any },
     });
-    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part) return res.status(500).json({ error: "No image generated" });
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
@@ -201,13 +197,13 @@ app.post("/api/generate-image", async (req, res) => {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
       contents: [{ role: "user", parts }],
-      generationConfig: { responseModalities: [Modality.IMAGE] as any },
+      config: { responseModalities: [Modality.IMAGE] as any },
     });
 
-    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part) return res.status(500).json({ error: "No image data" });
 
     // Deduct credit

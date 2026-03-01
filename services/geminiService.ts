@@ -1,7 +1,4 @@
-import { GoogleGenAI, Type, Modality, Part } from "@google/genai";
 import { PageBlueprint, Character, Language } from '../types';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 const API_BASE = '/api';
 
