@@ -333,6 +333,7 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [logoError, setLogoError] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,17 +368,22 @@ export default function Auth() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white p-4 z-50 absolute inset-0 overflow-hidden">
       <SpaceBackground />
       <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-          <img 
-            src="/auth-logo.png?v=2" 
-            alt="StorySpark Logo" 
-            style={{ width: '280px', height: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
-            onLoad={() => console.log("Auth Logo loaded successfully")}
-            onError={(e) => {
-              console.error("Auth logo load failed", e.nativeEvent);
-              (e.target as any).src = '/logo.png?v=2'; // Fallback to root logo
-            }}
-          />
+        <div className="flex justify-center mb-8 h-20 items-center">
+          {!logoError ? (
+            <img 
+              src="/logo.png?v=3" 
+              alt="StorySpark" 
+              className="max-h-full w-auto object-contain"
+              onError={() => {
+                console.error("Auth logo failed, using text fallback");
+                setLogoError(true);
+              }}
+            />
+          ) : (
+            <span className="text-4xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">
+              STORY<span className="text-blue-400">SPARK</span>
+            </span>
+          )}
         </div>
         
         <h2 className="text-2xl font-bold text-center mb-6">
