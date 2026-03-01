@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
@@ -18,8 +17,8 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.static("public"));
 
 // --- Simple Persistence Layer ---
-const DATA_DIR = path.resolve("./data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const DATA_DIR = process.env.VERCEL ? "/tmp/data" : path.resolve("./data");
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const CREDITS_FILE = path.join(DATA_DIR, "credits.json");
 
@@ -104,7 +103,7 @@ app.post("/api/generate-story", async (req, res) => {
     };
 
     const response = await genAI.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-preview",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
       config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema },
     }) as any;
@@ -144,7 +143,7 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-image-preview",
       contents: { parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] },
       config: { responseModalities: [Modality.IMAGE] },
     }) as any;
@@ -171,7 +170,7 @@ app.post("/api/generate-image", async (req, res) => {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-image-preview",
       contents: { parts },
       config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: "4:3" } },
     }) as any;
@@ -189,6 +188,7 @@ app.post("/api/generate-image", async (req, res) => {
 async function startServer() {
   let vite: any;
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "custom", // Changed to custom to handle HTML manually for better reliability
@@ -227,9 +227,15 @@ async function startServer() {
     }
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

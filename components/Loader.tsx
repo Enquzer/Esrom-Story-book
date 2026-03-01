@@ -14,9 +14,10 @@ const Loader: React.FC<LoaderProps> = ({ message, language }) => {
     <div className="flex flex-col items-center justify-center text-center p-8 bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-blue-100 max-w-md w-full">
       <div className="relative w-64 h-64 mb-6">
         <img 
-          src="/logo.png" 
+          src="https://storage.googleapis.com/applet-assets/storyspark-logo.png" 
           alt="StorySpark Logo" 
-          className="w-full h-full object-contain animate-pulse p-4"
+          className="w-full h-full object-contain animate-pulse"
+          referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
       </div>

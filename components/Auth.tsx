@@ -3,327 +3,125 @@ import { supabase } from '../services/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 const SpaceBackground = () => {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const [flash, setFlash] = useState(false);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    const planetColors = [
-      ['#ff8a65', '#bf360c'], ['#4fc3f7', '#01579b'],
-      ['#81c784', '#1b5e20'], ['#ba68c8', '#4a148c'],
-      ['#ffd54f', '#f57f17'], ['#e0e0e0', '#424242']
-    ];
-
-    class Particle {
-      x: number; y: number; vx: number; vy: number;
-      life: number; color: string; size: number;
-      constructor(x: number, y: number, color: string) {
-        this.x = x; this.y = y;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 5 + 2;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        this.life = 1.0;
-        this.color = color;
-        this.size = Math.random() * 3 + 1;
-      }
-      update() {
-        this.x += this.vx; this.y += this.vy;
-        this.life -= 0.02;
-      }
-      draw(ctx: CanvasRenderingContext2D) {
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    class Sun {
-      x: number; y: number; radius: number; mass: number;
-      constructor() {
-        this.x = width / 2;
-        this.y = height / 2;
-        this.radius = 45;
-        this.mass = 2000;
-      }
-      draw(ctx: CanvasRenderingContext2D) {
-        const grad = ctx.createRadialGradient(this.x, this.y, 5, this.x, this.y, this.radius);
-        grad.addColorStop(0, '#fffde7');
-        grad.addColorStop(0.3, '#ffeb3b');
-        grad.addColorStop(0.7, '#f57f17');
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Core
-        ctx.fillStyle = '#fff7bc';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 40;
-        ctx.shadowColor = '#f57f17';
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
-    }
-
-    class Planet {
-      x: number; y: number; vx: number; vy: number;
-      radius: number; mass: number;
-      color1: string; color2: string;
-      moons: any[]; hasRing: boolean; ringAngle: number;
-      angle: number;
-      isOffScreen: boolean = false;
-
-      constructor() {
-        this.radius = 12 + Math.random() * 20;
-        this.mass = this.radius * 3;
-        // Spawn near edges or random
-        this.x = Math.random() * width;
-        this.y = Math.random() * height;
-        // Tangential velocity for semi-stable orbits initially
-        const dx = this.x - width / 2;
-        const dy = this.y - height / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const speed = 2 + Math.random() * 2;
-        this.vx = (-dy / dist) * speed + (Math.random() - 0.5);
-        this.vy = (dx / dist) * speed + (Math.random() - 0.5);
-
-        const colors = planetColors[Math.floor(Math.random() * planetColors.length)];
-        this.color1 = colors[0];
-        this.color2 = colors[1];
-        this.hasRing = Math.random() > 0.7;
-        this.ringAngle = Math.random() * Math.PI;
-        this.angle = 0;
-        this.moons = Array.from({ length: Math.floor(Math.random() * 3) }, () => ({
-          dist: this.radius + 15 + Math.random() * 20,
-          speed: 0.005 + Math.random() * 0.015, // SLOWER MOONS
-          angle: Math.random() * Math.PI * 2,
-          size: 3 + Math.random() * 3,
-          color: '#ddd'
-        }));
-      }
-
-      update(planets: Planet[], sun: Sun) {
-        const G = 0.5;
-        
-        // Gravity from Sun
-        const sdx = sun.x - this.x;
-        const sdy = sun.y - this.y;
-        const sDistSq = sdx * sdx + sdy * sdy;
-        const sDist = Math.sqrt(sDistSq);
-        const sForce = (G * this.mass * sun.mass) / Math.max(sDistSq, 1000);
-        this.vx += (sdx / sDist) * (sForce / this.mass);
-        this.vy += (sdy / sDist) * (sForce / this.mass);
-
-        // N-body gravity
-        planets.forEach(other => {
-          if (other === this) return;
-          const dx = other.x - this.x;
-          const dy = other.y - this.y;
-          const distSq = dx * dx + dy * dy;
-          const dist = Math.sqrt(distSq);
-          if (dist < 1) return;
-          const force = (G * this.mass * other.mass) / Math.max(distSq, 500);
-          this.vx += (dx / dist) * (force / this.mass);
-          this.vy += (dy / dist) * (force / this.mass);
-        });
-
-        this.x += this.vx;
-        this.y += this.vy;
-        this.angle += 0.01;
-
-        // Memory Management: Delete if far off screen
-        const margin = 200;
-        if (this.x < -margin || this.x > width + margin || 
-            this.y < -margin || this.y > height + margin) {
-          this.isOffScreen = true;
-        }
-      }
-
-      draw(ctx: CanvasRenderingContext2D) {
-        this.moons.forEach(m => {
-          m.angle += m.speed;
-          const mx = this.x + Math.cos(m.angle) * m.dist;
-          const my = this.y + Math.sin(m.angle) * m.dist;
-          ctx.fillStyle = m.color;
-          ctx.beginPath();
-          ctx.arc(mx, my, m.size, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        const grad = ctx.createRadialGradient(this.x - this.radius/3, this.y - this.radius/3, this.radius/10, this.x, this.y, this.radius);
-        grad.addColorStop(0, this.color1);
-        grad.addColorStop(1, this.color2);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (this.hasRing) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.ellipse(this.x, this.y, this.radius * 2.2, this.radius * 0.4, this.ringAngle, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-    }
-
-    const sun = new Sun();
-    let planets = Array.from({ length: 6 }, () => new Planet());
-    let particles: Particle[] = [];
-
-    const stars = Array.from({ length: 150 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      size: Math.random() * 1.5 + 0.5,
-      opacity: Math.random() * 0.5 + 0.3
-    }));
-
-    const animate = () => {
-      ctx.fillStyle = '#020107';
-      ctx.fillRect(0, 0, width, height);
-
-      stars.forEach(s => {
-        ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
-        ctx.beginPath();
-        ctx.arc(s.x * width, s.y * height, s.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      sun.draw(ctx);
-
-      // Filter off-screen planets
-      planets = planets.filter(p => !p.isOffScreen);
-      
-      // Respawn if too few
-      if (planets.length < 4) {
-        const newP = new Planet();
-        // Force spawn near edges so they fly in
-        const side = Math.floor(Math.random() * 4);
-        if (side === 0) { newP.x = -50; newP.y = Math.random() * height; }
-        else if (side === 1) { newP.x = width + 50; newP.y = Math.random() * height; }
-        else if (side === 2) { newP.y = -50; newP.x = Math.random() * width; }
-        else { newP.y = height + 50; newP.x = Math.random() * width; }
-        planets.push(newP);
-      }
-
-      planets.forEach((p, i) => {
-        p.update(planets, sun);
-        p.draw(ctx);
-        
-        for (let j = i + 1; j < planets.length; j++) {
-          const other = planets[j];
-          const dx = other.x - p.x;
-          const dy = other.y - p.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < p.radius + other.radius) {
-            setFlash(true);
-            setTimeout(() => setFlash(false), 80);
-            for(let k=0; k<15; k++) particles.push(new Particle(p.x + dx/2, p.y + dy/2, p.color1));
-            const angle = Math.atan2(dy, dx);
-            const targetX = p.x + Math.cos(angle) * (p.radius + other.radius);
-            const targetY = p.y + Math.sin(angle) * (p.radius + other.radius);
-            const ax = (targetX - other.x) * 0.15;
-            const ay = (targetY - other.y) * 0.15;
-            p.vx -= ax; p.vy -= ay;
-            other.vx += ax; other.vy += ay;
-          }
-        }
-      });
-
-      // Update & Draw Debris
-      particles = particles.filter(p => p.life > 0);
-      particles.forEach(p => {
-        p.update();
-        p.draw(ctx);
-      });
-
-      animationFrameId = requestAnimationFrame(animate);
-    };
-
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-
-    window.addEventListener('resize', handleResize);
-    animate();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
   return (
-    <div className="absolute inset-0 overflow-hidden bg-[#020107] z-0 pointer-events-none">
-      <canvas ref={canvasRef} className="block w-full h-full" />
-      {flash && <div className="absolute inset-0 bg-white z-50 opacity-40 transition-opacity" />}
+    <div className="absolute inset-0 overflow-hidden bg-slate-900 z-0 pointer-events-none">
       <style>
         {`
-          .auth-stars {
-            display: none; /* Replaced by Canvas stars */
+          @keyframes fly {
+            0% { transform: translate(-150px, 110vh) rotate(45deg); }
+            100% { transform: translate(110vw, -150px) rotate(45deg); }
           }
-          .auth-shuttle {
-            position: absolute;
-            left: 10%; bottom: -200px;
-            width: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            animation: auth-shuttle-launch 20s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-            z-index: 10;
+          @keyframes fly2 {
+            0% { transform: translate(110vw, 80vh) rotate(-45deg) scale(0.6); }
+            100% { transform: translate(-150px, -20vh) rotate(-45deg) scale(0.6); }
           }
-          .auth-shuttle-nose {width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 20px solid #e0e0e0;}
-          .auth-shuttle-body {width: 20px; height: 40px; background: #f0f0f0; position: relative; border-radius: 2px 2px 4px 4px; border-bottom: 4px solid #444;}
-          .auth-shuttle-window {width: 10px; height: 6px; background: #1a237e; margin: 6px auto; border-radius: 1px; border: 0.5px solid #0d47a1;}
-          .auth-solar-panel {position: absolute; width: 30px; height: 8px; background: linear-gradient(45deg, #1a237e, #0d47a1); border: 0.5px solid #42a5f5; top: 15px; background-size: 5px 5px; background-image: linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);}
-          .auth-solar-left { right: 100%; border-radius: 2px 0 0 2px; }
-          .auth-solar-right { left: 100%; border-radius: 0 2px 2px 0; }
-          .auth-shuttle-engine {width: 14px; height: 5px; background: #fff; border-radius: 50%; filter: blur(2px); box-shadow: 0 0 10px #fff, 0 5px 20px #00d4ff, 0 15px 40px #00d4ff; animation: auth-flicker-v 0.1s infinite alternate;}
-          @keyframes auth-shuttle-launch {
-            0% { transform: translateY(0) scale(0.6); bottom: -200px; opacity: 0; }
-            5% { opacity: 1; }
-            45% { transform: translateY(-50vh) scale(0.8) rotate(3deg); }
-            100% { transform: translateY(-130vh) scale(1.1) rotate(-2deg); bottom: 100%; }
+          @keyframes galaxy-rotate {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
           }
-          @keyframes auth-flicker-v { 0% { opacity: 0.8; transform: scaleX(0.9); } 100% { opacity: 1; transform: scaleX(1.1); box-shadow: 0 0 30px #00d4ff; } }
-          .auth-welcome-text { animation: auth-fade-in-out 4s ease-in-out infinite; }
-          @keyframes auth-fade-in-out { 0%, 100% { opacity: 0; transform: translateY(10px); } 20%, 80% { opacity: 1; transform: translateY(0); } }
+          @keyframes galaxy-rotate-reverse {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(-360deg); }
+          }
+          @keyframes orbit-center {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes orbit-center-reverse {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(-360deg); }
+          }
+          .stars-bg-1 {
+            background-image: 
+              radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 200px 200px;
+          }
+          .stars-bg-2 {
+            background-image: 
+              radial-gradient(2px 2px at 90px 40px, #fff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 130px 80px, #fff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 160px 120px, #ddd, rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 300px 300px;
+          }
         `}
       </style>
       
-      {/* Small Vertical Shuttle */}
-      <div className="auth-shuttle">
-        <div className="auth-shuttle-nose"></div>
-        <div className="auth-shuttle-body">
-          <div className="auth-shuttle-window"></div>
-          <div className="auth-solar-panel auth-solar-left"></div>
-          <div className="auth-solar-panel auth-solar-right"></div>
+      {/* Stars - Rotating Galaxy */}
+      <div className="absolute top-1/2 left-1/2 w-[300vw] h-[300vh] stars-bg-1" style={{ animation: 'galaxy-rotate 200s linear infinite' }} />
+      <div className="absolute top-1/2 left-1/2 w-[300vw] h-[300vh] stars-bg-2" style={{ animation: 'galaxy-rotate-reverse 250s linear infinite' }} />
+      
+      {/* Central Sun/Galaxy Core Glow */}
+      <div className="absolute top-1/2 left-1/2 w-32 h-32 -ml-16 -mt-16 rounded-full opacity-20 blur-3xl bg-blue-500" />
+
+      {/* Planet 1 System (Inner) */}
+      <div className="absolute top-1/2 left-1/2" style={{ animation: 'orbit-center 25s linear infinite' }}>
+        <div className="absolute" style={{ transform: 'translateX(25vmin)' }}>
+           {/* Planet 1 */}
+           <div className="w-16 h-16 md:w-24 md:h-24 rounded-full -ml-8 -mt-8 md:-ml-12 md:-mt-12" style={{
+             background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+             boxShadow: 'inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 20px rgba(78,205,196,0.4)',
+             animation: 'orbit-center-reverse 25s linear infinite'
+           }} />
         </div>
-        <div className="auth-shuttle-engine"></div>
       </div>
 
-      <div className="absolute w-full text-center top-[45%] text-white z-20 tracking-[10px] uppercase pointer-events-none">
-        <h1 className="auth-welcome-text text-xl md:text-3xl font-light drop-shadow-[0_0_20px_rgba(0,212,255,0.5)]">
-          Initiating Systems
-        </h1>
+      {/* Planet 2 System (Middle) with a moon (Cycloidal/Epicyclic) */}
+      <div className="absolute top-1/2 left-1/2" style={{ animation: 'orbit-center 45s linear infinite' }}>
+        <div className="absolute" style={{ transform: 'translateX(40vmin)' }}>
+           {/* Planet 2 */}
+           <div className="w-24 h-24 md:w-32 md:h-32 rounded-full -ml-12 -mt-12 md:-ml-16 md:-mt-16" style={{
+             background: 'linear-gradient(45deg, #45B7D1, #2C3E50)',
+             boxShadow: 'inset -15px -15px 30px rgba(0,0,0,0.6), 0 0 30px rgba(69,183,209,0.3)',
+             animation: 'orbit-center-reverse 45s linear infinite'
+           }} />
+           {/* Moon orbiting Planet 2 */}
+           <div className="absolute top-0 left-0" style={{ animation: 'orbit-center 10s linear infinite' }}>
+             <div className="w-6 h-6 md:w-8 md:h-8 rounded-full -ml-3 -mt-3 md:-ml-4 md:-mt-4" style={{
+               transform: 'translateX(12vmin)',
+               background: 'linear-gradient(45deg, #FDCB6E, #E17055)',
+               boxShadow: 'inset -2px -2px 5px rgba(0,0,0,0.5)'
+             }} />
+           </div>
+        </div>
       </div>
+
+      {/* Planet 3 System (Outer) */}
+      <div className="absolute top-1/2 left-1/2" style={{ animation: 'orbit-center 70s linear infinite' }}>
+        <div className="absolute" style={{ transform: 'translateX(60vmin)' }}>
+           {/* Planet 3 */}
+           <div className="w-12 h-12 md:w-16 md:h-16 rounded-full -ml-6 -mt-6 md:-ml-8 md:-mt-8" style={{
+             background: 'linear-gradient(45deg, #A8E6CF, #3D84A8)',
+             boxShadow: 'inset -5px -5px 10px rgba(0,0,0,0.5)',
+             animation: 'orbit-center-reverse 70s linear infinite'
+           }} />
+        </div>
+      </div>
+
+      {/* Moving Spaceship 1 */}
+      <svg className="absolute w-24 h-24 md:w-32 md:h-32" style={{ animation: 'fly 20s linear infinite' }} viewBox="0 0 100 100">
+        <g transform="rotate(45 50 50)">
+          <path d="M 50 10 C 30 30, 30 70, 50 90 C 70 70, 70 30, 50 10 Z" fill="#E0E0E0" stroke="#B0B0B0" strokeWidth="2"/>
+          <circle cx="50" cy="40" r="10" fill="#80D8FF" stroke="#404040" strokeWidth="1"/>
+          <path d="M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z" fill="#FF4500">
+            <animate attributeName="d" values="M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z; M 40 90 C 45 110, 55 110, 60 90 C 55 100, 45 100, 40 90 Z; M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z" dur="0.3s" repeatCount="indefinite" />
+          </path>
+        </g>
+      </svg>
+
+      {/* Moving Spaceship 2 */}
+      <svg className="absolute w-20 h-20" style={{ animation: 'fly2 25s linear infinite 5s' }} viewBox="0 0 100 100">
+        <g transform="rotate(45 50 50)">
+          <path d="M 50 10 C 30 30, 30 70, 50 90 C 70 70, 70 30, 50 10 Z" fill="#FFD700" stroke="#DAA520" strokeWidth="2"/>
+          <circle cx="50" cy="40" r="10" fill="#80D8FF" stroke="#404040" strokeWidth="1"/>
+          <path d="M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z" fill="#FF4500">
+            <animate attributeName="d" values="M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z; M 40 90 C 45 110, 55 110, 60 90 C 55 100, 45 100, 40 90 Z; M 40 90 C 45 100, 55 100, 60 90 C 55 95, 45 95, 40 90 Z" dur="0.3s" repeatCount="indefinite" />
+          </path>
+        </g>
+      </svg>
     </div>
   );
 };
@@ -332,7 +130,19 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,106 +161,62 @@ export default function Auth() {
     setLoading(false);
   };
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
-    if (error) alert(error.message);
-    setLoading(false);
-  };
+  if (user) {
+    return (
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full shadow-lg"
+        >
+          Sign Out
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white p-4 z-50 absolute inset-0 overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-4 z-50 absolute inset-0 overflow-hidden">
       <SpaceBackground />
-      <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
+      <div className="bg-slate-800/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-slate-700">
         <div className="flex justify-center mb-6">
           <img 
-            src="/logo.png" 
+            src="https://storage.googleapis.com/applet-assets/storyspark-logo.png" 
             alt="StorySpark Logo" 
             className="w-48 h-auto object-contain drop-shadow-2xl"
+            referrerPolicy="no-referrer"
           />
         </div>
-        
-        <h2 className="text-2xl font-bold text-center mb-6">
-          {mode === 'login' ? 'Welcome Back!' : 'Create an Account'}
-        </h2>
-
         <form className="flex flex-col gap-4">
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="p-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white placeholder:text-slate-500"
+            className="p-3 rounded-xl bg-slate-700/80 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="p-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white placeholder:text-slate-500"
+            className="p-3 rounded-xl bg-slate-700/80 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
           />
-          
-          <button
-            onClick={mode === 'login' ? handleLogin : handleSignUp}
-            disabled={loading}
-            className={`w-full mt-4 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 ${
-              mode === 'login' 
-                ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30' 
-                : 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/30'
-            }`}
-          >
-            {loading ? 'Processing...' : mode === 'login' ? 'Log In' : 'Sign Up'}
-          </button>
-
-          <p className="text-center text-sm text-slate-400 mt-2">
-            {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
-            <button 
-              type="button"
-              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-              className="text-blue-400 hover:underline font-bold"
+          <div className="flex gap-4 mt-4">
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/30 active:scale-95"
             >
-              {mode === 'login' ? 'Sign Up' : 'Log In'}
+              Log In
             </button>
-          </p>
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-700"></span>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-800 px-2 text-slate-400">Or continue with</span>
-            </div>
+            <button
+              onClick={handleSignUp}
+              disabled={loading}
+              className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-600/30 active:scale-95"
+            >
+              Sign Up
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                fill="#EA4335"
-              />
-            </svg>
-            Google
-          </button>
         </form>
       </div>
     </div>

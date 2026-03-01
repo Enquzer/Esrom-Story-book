@@ -1,17 +1,5 @@
-/**
- * InteractivePaper.tsx
- *
- * High-fidelity 3D book page flip with:
- *  1. Perspective hinge (transform-origin: left center, preserve-3d, backface-visibility: hidden)
- *  2. Paper Curl Physics via rAF loop:
- *       - Peel (skewY = sin(rot) × 7°)
- *       - Taper (clip-path: polygon, corners pinch when ±90°)
- *       - Dynamic lighting (linear-gradient opacity peaks at 0.4 @ ±90°)
- *  3. Z-index management (page drops under left stack at -180°)
- *  4. Drag-to-flip with spring-damping snap
- */
-
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Page, Language } from '../types';
 
 interface InteractivePaperProps {
   frontContent: React.ReactNode;
@@ -30,180 +18,160 @@ const InteractivePaper: React.FC<InteractivePaperProps> = ({
   zIndex,
   onFlip,
   canFlipNext,
-  canFlipPrev,
+  canFlipPrev
 }) => {
-  const leafRef = useRef<HTMLDivElement>(null);
-  const rotRef = useRef(isFlipped ? -180 : 0);
-  const targetRef = useRef(isFlipped ? -180 : 0);
-  const rafRef = useRef<number | null>(null);
-  const draggingRef = useRef(false);
+  const paperRef = useRef<HTMLDivElement>(null);
+  const shadowRef = useRef<HTMLDivElement>(null);
+  const [rotation, setRotation] = useState(isFlipped ? -180 : 0);
+  const rotationRef = useRef(isFlipped ? -180 : 0);
+  const targetRotationRef = useRef(isFlipped ? -180 : 0);
+  const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
-  const startRotRef = useRef(0);
+  const startRotationRef = useRef(0);
+  const animationFrameRef = useRef<number | null>(null);
 
-  // --- RENDERING STRIPS FOR THE MESH ---
-  // We use a high-performance 'Mesh Simulation' using dynamic CSS variables
-  // and non-linear clip-paths to simulate the soft bend without 20 heavy divs.
+  // Sync internal state when prop changes (for nav buttons)
+  useEffect(() => {
+    const target = isFlipped ? -180 : 0;
+    targetRotationRef.current = target;
+    // If not dragging, start animation to target
+    if (!isDraggingRef.current) {
+        startAnimation();
+    }
+  }, [isFlipped]);
+
   const updateStyles = useCallback((rot: number) => {
-    const leaf = leafRef.current;
-    if (!leaf) return;
+    if (!paperRef.current) return;
 
+    // 1. Apply Rotation and Skew (Peel Effect)
+    // Formula: skewY = -sin(rotationRad) * 5deg (Negative sin because rotation is 0 to -180)
     const rad = (rot * Math.PI) / 180;
-    const absSin = Math.abs(Math.sin(rad));
+    const skew = -Math.sin(rad) * 5;
     
-    // Geometric Curve: Parabolic lift and S-curve skew
-    // This mimics the 'S-curve' tension of real paper
-    const skew = -Math.sin(rad) * 11; 
-    const twist = Math.sin(rad * 2) * 4;
-    const lift = absSin * 85; 
+    paperRef.current.style.transform = `rotateY(${rot}deg) skewY(${skew}deg)`;
+    paperRef.current.style.zIndex = String(zIndex);
 
-    leaf.style.transform = `rotateY(${rot}deg) skewY(${skew}deg) rotateX(${twist}deg) translateZ(${lift}px)`;
+    // 2. Dynamic Clip-Path (Curl Logic)
+    // As rotation reaches -90, taper corners.
+    // 0deg: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)
+    // -90deg: polygon(0% 0%, 100% 10%, 100% 90%, 0% 100%) - simplified taper
+    // -180deg: back to flat (but mirrored)
+    
+    // Calculate taper factor: 0 at 0 or -180, peaks at -90
+    // abs(sin(rad)) peaks at -90 (sin(-90) = -1)
+    const taper = Math.abs(Math.sin(rad)) * 10; // 10% taper
+    const clipPath = `polygon(0% 0%, 100% ${taper}%, 100% ${100 - taper}%, 0% 100%)`;
+    paperRef.current.style.clipPath = clipPath;
 
-    // Shadow Gradient Mapping: Light 'rolls' over the curve
-    const shadowPos = (rot + 180) / 1.8; // Map 0..-180 to shadow position
-    leaf.style.setProperty('--shadow-pos', `${shadowPos}%`);
-    leaf.style.setProperty('--bend-offset', `${absSin * 12}%`);
-    leaf.style.setProperty('--shadow-opacity', String(absSin * 0.4));
-
-    leaf.style.zIndex = String(zIndex);
+    // 3. Dynamic Shading
+    // Apply linear-gradient overlay to the .front face via shadowRef
+    // Opacity tied to rotation: 0 at 0, 0.3 at -90
+    if (shadowRef.current) {
+        const shadowOpacity = Math.abs(Math.sin(rad)) * 0.3;
+        shadowRef.current.style.opacity = String(shadowOpacity);
+    }
   }, [zIndex]);
 
   const animate = useCallback(() => {
-    const diff = targetRef.current - rotRef.current;
-    if (Math.abs(diff) < 0.05) {
-      rotRef.current = targetRef.current;
-      updateStyles(rotRef.current);
-      rafRef.current = null;
+    const diff = targetRotationRef.current - rotationRef.current;
+    if (Math.abs(diff) < 0.1) {
+      rotationRef.current = targetRotationRef.current;
+      setRotation(rotationRef.current);
+      updateStyles(rotationRef.current);
+      animationFrameRef.current = null;
       return;
     }
-    // Cubic-Bezier like smoothing logic
-    rotRef.current += diff * 0.13; 
-    updateStyles(rotRef.current);
-    rafRef.current = requestAnimationFrame(animate);
+
+    rotationRef.current += diff * 0.15; // Smooth damping
+    setRotation(rotationRef.current);
+    updateStyles(rotationRef.current);
+    animationFrameRef.current = requestAnimationFrame(animate);
   }, [updateStyles]);
 
-  const startAnimation = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(animate);
-  }, [animate]);
-
-  useEffect(() => {
-    targetRef.current = isFlipped ? -180 : 0;
-    if (!draggingRef.current) startAnimation();
-  }, [isFlipped, startAnimation]);
-
-  useEffect(() => {
-    updateStyles(rotRef.current);
-  }, [updateStyles]);
+  const startAnimation = () => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!canFlipNext && !isFlipped) return;
     if (!canFlipPrev && isFlipped) return;
-    draggingRef.current = true;
+
+    isDraggingRef.current = true;
     startXRef.current = e.clientX;
-    startRotRef.current = rotRef.current;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    leafRef.current?.setPointerCapture(e.pointerId);
+    startRotationRef.current = rotationRef.current;
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    paperRef.current?.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingRef.current) return;
+    if (!isDraggingRef.current) return;
+
     const deltaX = e.clientX - startXRef.current;
+    // Sensitivity: 180 degrees over roughly 50% of screen width (approx 500px)
     const movement = (deltaX / 500) * 180;
-    const newRot = Math.max(-180, Math.min(0, startRotRef.current + movement));
-    rotRef.current = newRot;
-    updateStyles(newRot);
+    
+    let newRotation = startRotationRef.current + movement;
+    
+    // Clamp rotation
+    newRotation = Math.max(-180, Math.min(0, newRotation));
+    
+    rotationRef.current = newRotation;
+    updateStyles(newRotation);
+    setRotation(newRotation);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    leafRef.current?.releasePointerCapture(e.pointerId);
-    if (Math.abs(rotRef.current) > 90) { targetRef.current = -180; onFlip(true); }
-    else { targetRef.current = 0; onFlip(false); }
-    startAnimation();
-  };
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    paperRef.current?.releasePointerCapture(e.pointerId);
 
-  const handleClick = () => {
-    if (Math.abs(rotRef.current - startRotRef.current) > 5) return;
-    if (!isFlipped && canFlipNext) { targetRef.current = -180; onFlip(true); startAnimation(); }
-    else if (isFlipped && canFlipPrev) { targetRef.current = 0; onFlip(false); startAnimation(); }
+    // Snap logic: if abs(rotation) > 90, animate to -180, else animate to 0
+    if (Math.abs(rotationRef.current) > 90) {
+      targetRotationRef.current = -180;
+      onFlip(true);
+    } else {
+      targetRotationRef.current = 0;
+      onFlip(false);
+    }
+    startAnimation();
   };
 
   return (
     <div
-      ref={leafRef}
+      ref={paperRef}
       className="paper interactive-paper"
       style={{
         zIndex,
+        perspective: '2000px',
         transformStyle: 'preserve-3d',
         transformOrigin: 'left center',
         cursor: 'grab',
-        touchAction: 'none',
-        transition: 'none',
-        willChange: 'transform'
+        touchAction: 'none'
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onClick={handleClick}
     >
-      {/* Front Face Simulation with Soft Bend Mesh */}
-      <div 
-        className="page-front page-content absolute inset-0 bg-white shadow-2xl"
-        style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transform: 'translateZ(1px)',
-          // The Photorealistic Mesh Bend: Non-Linear Clipping
-          clipPath: `polygon(
-            0% var(--bend-offset), 
-            100% 0%, 
-            100% 100%, 
-            0% calc(100% - var(--bend-offset))
-          )`,
-          background: `
-            linear-gradient(90deg, 
-              #fff 0%, 
-              rgba(0,0,0,var(--shadow-opacity)) var(--shadow-pos), 
-              #fff calc(var(--shadow-pos) + 20%), 
-              #fff 100%
-            ), #fdfcf8
-          `,
-          backgroundSize: '200% 100%'
-        }}
-      >
+      <div className="page-content front relative bg-white border-l-2 border-slate-200">
         {frontContent}
-        {/* Hinge Shadow */}
-        <div className="absolute top-0 left-0 w-12 h-full bg-linear-to-r from-black/20 to-transparent z-10 pointer-events-none" />
+        {/* Dynamic Shadow Overlay */}
+        <div 
+            ref={shadowRef}
+            className="absolute inset-0 pointer-events-none transition-opacity duration-75"
+            style={{
+                background: 'linear-gradient(to right, rgba(0,0,0,0.5) 0%, transparent 15%, transparent 100%)',
+                opacity: 0,
+                zIndex: 10
+            }}
+        />
+        {/* Page Line for Hinge */}
+        <div className="absolute top-0 left-0 w-[2px] h-full bg-slate-200 z-20" />
       </div>
-
-      {/* Back Face Simulation */}
-      <div 
-        className="page-back page-content absolute inset-0 bg-white shadow-2xl"
-        style={{
-          transform: 'rotateY(180deg) translateZ(1px)',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          clipPath: `polygon(
-            0% 0%, 
-            100% var(--bend-offset), 
-            100% calc(100% - var(--bend-offset)), 
-            0% 100%
-          )`,
-          background: `
-            linear-gradient(-90deg, 
-              #fff 0%, 
-              rgba(0,0,0,var(--shadow-opacity)) var(--shadow-pos), 
-              #fff calc(var(--shadow-pos) + 20%), 
-              #fff 100%
-            ), #fdfcf8
-          `,
-          backgroundSize: '200% 100%'
-        }}
-      >
+      <div className="page-content back relative bg-white border-r-2 border-slate-200">
+        <div className="absolute top-0 right-0 w-[2px] h-full bg-slate-200 z-20" />
         {backContent}
-        <div className="absolute top-0 right-0 w-12 h-full bg-linear-to-l from-black/20 to-transparent z-10 pointer-events-none" />
       </div>
     </div>
   );
