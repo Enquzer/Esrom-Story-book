@@ -65,15 +65,45 @@ app.post("/api/credits/use", (req, res) => {
 
 // --- Vite Middleware ---
 async function startServer() {
+  let vite: any;
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom", // Changed to custom to handle HTML manually for better reliability
     });
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
   }
+
+  // Explicitly serve index.html for all non-API GET routes
+  app.use(async (req, res, next) => {
+    // Only handle GET requests that don't start with /api
+    if (req.method !== "GET" || req.originalUrl.startsWith("/api")) {
+      return next();
+    }
+
+    const url = req.originalUrl;
+    try {
+      let template: string;
+      if (process.env.NODE_ENV !== "production") {
+        // Read index.html from root for development
+        template = fs.readFileSync(path.resolve("./index.html"), "utf-8");
+        // Transform the HTML through Vite (handles @vite/client and other injections)
+        template = await vite.transformIndexHtml(url, template);
+      } else {
+        // In production, serve the built index.html from dist
+        template = fs.readFileSync(path.resolve("./dist/index.html"), "utf-8");
+      }
+      res.status(200).set({ "Content-Type": "text/html" }).end(template);
+    } catch (e: any) {
+      if (process.env.NODE_ENV !== "production") {
+        vite.ssrFixStacktrace(e);
+      }
+      console.error("Error serving index.html:", e);
+      res.status(500).end(e.stack);
+    }
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

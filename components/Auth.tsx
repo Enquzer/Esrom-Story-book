@@ -3,66 +3,282 @@ import { supabase } from '../services/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 const SpaceBackground = () => {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const planetColors = [
+      ['#ff8a65', '#bf360c'], ['#4fc3f7', '#01579b'],
+      ['#81c784', '#1b5e20'], ['#ba68c8', '#4a148c'],
+      ['#ffd54f', '#f57f17'], ['#e0e0e0', '#424242']
+    ];
+
+    class Particle {
+      x: number; y: number; vx: number; vy: number;
+      life: number; color: string; size: number;
+      constructor(x: number, y: number, color: string) {
+        this.x = x; this.y = y;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 2;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.life = 1.0;
+        this.color = color;
+        this.size = Math.random() * 3 + 1;
+      }
+      update() {
+        this.x += this.vx; this.y += this.vy;
+        this.life -= 0.02;
+      }
+      draw(ctx: CanvasRenderingContext2D) {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    class Sun {
+      x: number; y: number; radius: number; mass: number;
+      constructor() {
+        this.x = width / 2;
+        this.y = height / 2;
+        this.radius = 45;
+        this.mass = 2000;
+      }
+      draw(ctx: CanvasRenderingContext2D) {
+        const grad = ctx.createRadialGradient(this.x, this.y, 5, this.x, this.y, this.radius);
+        grad.addColorStop(0, '#fffde7');
+        grad.addColorStop(0.3, '#ffeb3b');
+        grad.addColorStop(0.7, '#f57f17');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Core
+        ctx.fillStyle = '#fff7bc';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = '#f57f17';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    class Planet {
+      x: number; y: number; vx: number; vy: number;
+      radius: number; mass: number;
+      color1: string; color2: string;
+      moons: any[]; hasRing: boolean; ringAngle: number;
+      angle: number;
+      isOffScreen: boolean = false;
+
+      constructor() {
+        this.radius = 12 + Math.random() * 20;
+        this.mass = this.radius * 3;
+        // Spawn near edges or random
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        // Tangential velocity for semi-stable orbits initially
+        const dx = this.x - width / 2;
+        const dy = this.y - height / 2;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const speed = 2 + Math.random() * 2;
+        this.vx = (-dy / dist) * speed + (Math.random() - 0.5);
+        this.vy = (dx / dist) * speed + (Math.random() - 0.5);
+
+        const colors = planetColors[Math.floor(Math.random() * planetColors.length)];
+        this.color1 = colors[0];
+        this.color2 = colors[1];
+        this.hasRing = Math.random() > 0.7;
+        this.ringAngle = Math.random() * Math.PI;
+        this.angle = 0;
+        this.moons = Array.from({ length: Math.floor(Math.random() * 3) }, () => ({
+          dist: this.radius + 15 + Math.random() * 20,
+          speed: 0.005 + Math.random() * 0.015, // SLOWER MOONS
+          angle: Math.random() * Math.PI * 2,
+          size: 3 + Math.random() * 3,
+          color: '#ddd'
+        }));
+      }
+
+      update(planets: Planet[], sun: Sun) {
+        const G = 0.5;
+        
+        // Gravity from Sun
+        const sdx = sun.x - this.x;
+        const sdy = sun.y - this.y;
+        const sDistSq = sdx * sdx + sdy * sdy;
+        const sDist = Math.sqrt(sDistSq);
+        const sForce = (G * this.mass * sun.mass) / Math.max(sDistSq, 1000);
+        this.vx += (sdx / sDist) * (sForce / this.mass);
+        this.vy += (sdy / sDist) * (sForce / this.mass);
+
+        // N-body gravity
+        planets.forEach(other => {
+          if (other === this) return;
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distSq = dx * dx + dy * dy;
+          const dist = Math.sqrt(distSq);
+          if (dist < 1) return;
+          const force = (G * this.mass * other.mass) / Math.max(distSq, 500);
+          this.vx += (dx / dist) * (force / this.mass);
+          this.vy += (dy / dist) * (force / this.mass);
+        });
+
+        this.x += this.vx;
+        this.y += this.vy;
+        this.angle += 0.01;
+
+        // Memory Management: Delete if far off screen
+        const margin = 200;
+        if (this.x < -margin || this.x > width + margin || 
+            this.y < -margin || this.y > height + margin) {
+          this.isOffScreen = true;
+        }
+      }
+
+      draw(ctx: CanvasRenderingContext2D) {
+        this.moons.forEach(m => {
+          m.angle += m.speed;
+          const mx = this.x + Math.cos(m.angle) * m.dist;
+          const my = this.y + Math.sin(m.angle) * m.dist;
+          ctx.fillStyle = m.color;
+          ctx.beginPath();
+          ctx.arc(mx, my, m.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        const grad = ctx.createRadialGradient(this.x - this.radius/3, this.y - this.radius/3, this.radius/10, this.x, this.y, this.radius);
+        grad.addColorStop(0, this.color1);
+        grad.addColorStop(1, this.color2);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (this.hasRing) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(this.x, this.y, this.radius * 2.2, this.radius * 0.4, this.ringAngle, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    const sun = new Sun();
+    let planets = Array.from({ length: 6 }, () => new Planet());
+    let particles: Particle[] = [];
+
+    const stars = Array.from({ length: 150 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      size: Math.random() * 1.5 + 0.5,
+      opacity: Math.random() * 0.5 + 0.3
+    }));
+
+    const animate = () => {
+      ctx.fillStyle = '#020107';
+      ctx.fillRect(0, 0, width, height);
+
+      stars.forEach(s => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
+        ctx.beginPath();
+        ctx.arc(s.x * width, s.y * height, s.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      sun.draw(ctx);
+
+      // Filter off-screen planets
+      planets = planets.filter(p => !p.isOffScreen);
+      
+      // Respawn if too few
+      if (planets.length < 4) {
+        const newP = new Planet();
+        // Force spawn near edges so they fly in
+        const side = Math.floor(Math.random() * 4);
+        if (side === 0) { newP.x = -50; newP.y = Math.random() * height; }
+        else if (side === 1) { newP.x = width + 50; newP.y = Math.random() * height; }
+        else if (side === 2) { newP.y = -50; newP.x = Math.random() * width; }
+        else { newP.y = height + 50; newP.x = Math.random() * width; }
+        planets.push(newP);
+      }
+
+      planets.forEach((p, i) => {
+        p.update(planets, sun);
+        p.draw(ctx);
+        
+        for (let j = i + 1; j < planets.length; j++) {
+          const other = planets[j];
+          const dx = other.x - p.x;
+          const dy = other.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < p.radius + other.radius) {
+            setFlash(true);
+            setTimeout(() => setFlash(false), 80);
+            for(let k=0; k<15; k++) particles.push(new Particle(p.x + dx/2, p.y + dy/2, p.color1));
+            const angle = Math.atan2(dy, dx);
+            const targetX = p.x + Math.cos(angle) * (p.radius + other.radius);
+            const targetY = p.y + Math.sin(angle) * (p.radius + other.radius);
+            const ax = (targetX - other.x) * 0.15;
+            const ay = (targetY - other.y) * 0.15;
+            p.vx -= ax; p.vy -= ay;
+            other.vx += ax; other.vy += ay;
+          }
+        }
+      });
+
+      // Update & Draw Debris
+      particles = particles.filter(p => p.life > 0);
+      particles.forEach(p => {
+        p.update();
+        p.draw(ctx);
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    const handleResize = () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#020107] z-0 pointer-events-none">
+      <canvas ref={canvasRef} className="block w-full h-full" />
+      {flash && <div className="absolute inset-0 bg-white z-50 opacity-40 transition-opacity" />}
       <style>
         {`
-          :root {
-            --space-bg: #020107;
-            --ion-glow: #00d4ff;
-          }
-
-          /* 1. Starfield */
           .auth-stars {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #020107;
-            background-image: 
-              radial-gradient(1.5px 1.5px at 20px 30px, #eee, rgba(0,0,0,0)),
-              radial-gradient(1.5px 1.5px at 150px 150px, #fff, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 100px 300px, #ddd, rgba(0,0,0,0)),
-              radial-gradient(1.5px 1.5px at 240px 100px, #fff, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 300px 250px, #ddd, rgba(0,0,0,0));
-            background-repeat: repeat;
-            background-size: 350px 350px;
-            animation: auth-drift 180s linear infinite;
-            z-index: 0;
+            display: none; /* Replaced by Canvas stars */
           }
-
-          /* 2. Planetary Systems */
-          .auth-orbit {
-            position: absolute;
-            top: 50%; left: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-          }
-
-          .auth-planet-wrapper {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 100%; height: 100%;
-            animation: auth-rotate var(--duration) linear infinite;
-          }
-
-          .auth-planet {
-            position: absolute;
-            top: 0; left: 50%;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: inset -15px -15px 40px rgba(0,0,0,0.8), 0 0 30px rgba(255,255,255,0.05);
-          }
-
-          .auth-moon {
-            position: absolute;
-            width: 10px; height: 10px;
-            background: radial-gradient(circle at 30% 30%, #ddd, #444);
-            border-radius: 50%;
-            top: 50%; left: 50%;
-            animation: auth-rotate var(--m-duration) linear infinite;
-          }
-
-          /* 3. Detailed Space Shuttle (Smaller Scale) */
           .auth-shuttle {
             position: absolute;
             left: 10%; bottom: -200px;
@@ -73,139 +289,24 @@ const SpaceBackground = () => {
             animation: auth-shuttle-launch 20s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             z-index: 10;
           }
-
-          .auth-shuttle-nose {
-            width: 0; height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 20px solid #e0e0e0;
-          }
-
-          .auth-shuttle-body {
-            width: 20px; height: 40px;
-            background: #f0f0f0;
-            position: relative;
-            border-radius: 2px 2px 4px 4px;
-            border-bottom: 4px solid #444;
-          }
-
-          .auth-shuttle-window {
-            width: 10px; height: 6px;
-            background: #1a237e;
-            margin: 6px auto;
-            border-radius: 1px;
-            border: 0.5px solid #0d47a1;
-          }
-
-          .auth-solar-panel {
-            position: absolute;
-            width: 30px; height: 8px;
-            background: linear-gradient(45deg, #1a237e, #0d47a1);
-            border: 0.5px solid #42a5f5;
-            top: 15px;
-            background-size: 5px 5px;
-            background-image: 
-              linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);
-          }
+          .auth-shuttle-nose {width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 20px solid #e0e0e0;}
+          .auth-shuttle-body {width: 20px; height: 40px; background: #f0f0f0; position: relative; border-radius: 2px 2px 4px 4px; border-bottom: 4px solid #444;}
+          .auth-shuttle-window {width: 10px; height: 6px; background: #1a237e; margin: 6px auto; border-radius: 1px; border: 0.5px solid #0d47a1;}
+          .auth-solar-panel {position: absolute; width: 30px; height: 8px; background: linear-gradient(45deg, #1a237e, #0d47a1); border: 0.5px solid #42a5f5; top: 15px; background-size: 5px 5px; background-image: linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px);}
           .auth-solar-left { right: 100%; border-radius: 2px 0 0 2px; }
           .auth-solar-right { left: 100%; border-radius: 0 2px 2px 0; }
-
-          .auth-shuttle-engine {
-            width: 14px; height: 5px;
-            background: #fff;
-            border-radius: 50%;
-            filter: blur(2px);
-            box-shadow: 
-              0 0 10px #fff,
-              0 5px 20px var(--ion-glow),
-              0 15px 40px var(--ion-glow);
-            animation: auth-flicker-v 0.1s infinite alternate;
-          }
-
-          /* Animations */
-          @keyframes auth-drift {
-            from { transform: translate(0, 0); }
-            to { transform: translate(-50%, -50%); }
-          }
-
-          @keyframes auth-rotate {
-            from { transform: translate(-50%, -50%) rotate(0deg); }
-            to { transform: translate(-50%, -50%) rotate(360deg); }
-          }
-
+          .auth-shuttle-engine {width: 14px; height: 5px; background: #fff; border-radius: 50%; filter: blur(2px); box-shadow: 0 0 10px #fff, 0 5px 20px #00d4ff, 0 15px 40px #00d4ff; animation: auth-flicker-v 0.1s infinite alternate;}
           @keyframes auth-shuttle-launch {
             0% { transform: translateY(0) scale(0.6); bottom: -200px; opacity: 0; }
             5% { opacity: 1; }
             45% { transform: translateY(-50vh) scale(0.8) rotate(3deg); }
             100% { transform: translateY(-130vh) scale(1.1) rotate(-2deg); bottom: 100%; }
           }
-
-          @keyframes auth-flicker-v {
-            0% { opacity: 0.8; transform: scaleX(0.9); }
-            100% { opacity: 1; transform: scaleX(1.1); box-shadow: 0 0 30px var(--ion-glow); }
-          }
-
-          .auth-welcome-text {
-             animation: auth-fade-in-out 4s ease-in-out infinite;
-          }
-
-          @keyframes auth-fade-in-out {
-            0%, 100% { opacity: 0; transform: translateY(10px); }
-            20%, 80% { opacity: 1; transform: translateY(0); }
-          }
+          @keyframes auth-flicker-v { 0% { opacity: 0.8; transform: scaleX(0.9); } 100% { opacity: 1; transform: scaleX(1.1); box-shadow: 0 0 30px #00d4ff; } }
+          .auth-welcome-text { animation: auth-fade-in-out 4s ease-in-out infinite; }
+          @keyframes auth-fade-in-out { 0%, 100% { opacity: 0; transform: translateY(10px); } 20%, 80% { opacity: 1; transform: translateY(0); } }
         `}
       </style>
-      
-      <div className="auth-stars"></div>
-      
-      {/* 1. Large Magma Planet (Tight Orbit) */}
-      <div className="auth-orbit w-[45vmin] h-[45vmin]" style={{"--duration": "45s"} as any}>
-        <div className="auth-planet-wrapper">
-          <div className="auth-planet w-24 h-24 md:w-32 md:h-32" style={{
-            background: 'radial-gradient(circle at 30% 30%, #ff8a65, #bf360c)',
-            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0,0,0,0.1) 15px, rgba(0,0,0,0.1) 30px)'
-          }} />
-        </div>
-      </div>
-
-      {/* 2. Giant Gas Giant with Moon (Middle Orbit) */}
-      <div className="auth-orbit w-[85vmin] h-[85vmin]" style={{"--duration": "80s"} as any}>
-        <div className="auth-planet-wrapper">
-          <div className="auth-planet w-40 h-40 md:w-64 md:h-64" style={{
-            background: 'radial-gradient(circle at 30% 30%, #4fc3f7, #01579b)',
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px)',
-            backgroundSize: '100% 20px'
-          }}>
-             <div className="auth-moon" style={{
-               "--m-duration": "10s",
-               "transform": "translateX(160px)"
-             } as any} />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Small Distance Moons/Small Planet (Outer Orbit) */}
-      <div className="auth-orbit w-[120vmin] h-[120vmin]" style={{"--duration": "150s"} as any}>
-        <div className="auth-planet-wrapper">
-          <div className="auth-planet w-12 h-12 md:w-16 md:h-16" style={{
-            background: 'radial-gradient(circle at 30% 30%, #e1f5fe, #0277bd)',
-            boxShadow: 'inset 0 0 15px rgba(255,255,255,0.4)'
-          }} />
-        </div>
-      </div>
-
-      {/* 4. Large Ring/Atmospheric Planet (Deep Orbit) */}
-      <div className="auth-orbit w-[160vmin] h-[160vmin]" style={{"--duration": "240s"} as any}>
-        <div className="auth-planet-wrapper">
-          <div className="auth-planet w-32 h-32 md:w-48 md:h-48" style={{
-            background: 'radial-gradient(circle at 30% 30%, #8e24aa, #4a148c)',
-            boxShadow: '0 0 50px rgba(142, 36, 170, 0.3)'
-          }}>
-             <div className="absolute inset-x-0 top-1/2 h-1 bg-white/10 blur-[2px] transform -rotate-12" />
-          </div>
-        </div>
-      </div>
       
       {/* Small Vertical Shuttle */}
       <div className="auth-shuttle">
@@ -263,9 +364,9 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-4 z-50 absolute inset-0 overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white p-4 z-50 absolute inset-0 overflow-hidden">
       <SpaceBackground />
-      <div className="bg-slate-800/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-slate-700">
+      <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
         <div className="flex justify-center mb-6">
           <img 
             src="/logo.png" 
@@ -284,14 +385,14 @@ export default function Auth() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="p-3 rounded-xl bg-slate-700/80 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white"
+            className="p-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white placeholder:text-slate-500"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="p-3 rounded-xl bg-slate-700/80 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white"
+            className="p-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white placeholder:text-slate-500"
           />
           
           <button
