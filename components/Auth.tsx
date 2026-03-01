@@ -367,11 +367,14 @@ export default function Auth() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white p-4 z-50 absolute inset-0 overflow-hidden">
       <SpaceBackground />
       <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-6 drop-shadow-2xl">
           <img 
             src="/logo.png" 
             alt="StorySpark Logo" 
-            className="w-48 h-auto object-contain drop-shadow-2xl"
+            className="w-full max-w-72 h-auto object-contain mx-auto"
+            onError={(e) => {
+              console.error("Auth logo load failed", e);
+            }}
           />
         </div>
         
