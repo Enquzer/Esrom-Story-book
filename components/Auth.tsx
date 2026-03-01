@@ -367,13 +367,15 @@ export default function Auth() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white p-4 z-50 absolute inset-0 overflow-hidden">
       <SpaceBackground />
       <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
-        <div className="flex justify-center mb-6 drop-shadow-2xl">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
           <img 
-            src="/logo.png" 
+            src="/auth-logo.png?v=2" 
             alt="StorySpark Logo" 
-            className="w-full max-w-72 h-auto object-contain mx-auto"
+            style={{ width: '280px', height: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
+            onLoad={() => console.log("Auth Logo loaded successfully")}
             onError={(e) => {
-              console.error("Auth logo load failed", e);
+              console.error("Auth logo load failed", e.nativeEvent);
+              (e.target as any).src = '/logo.png?v=2'; // Fallback to root logo
             }}
           />
         </div>
