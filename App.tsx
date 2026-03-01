@@ -98,9 +98,30 @@ function App() {
   const fetchHighScores = useCallback(async () => {
     try {
       const scores = await getHighScores();
-      setHighScores(scores);
-    } catch (e) { console.error("Failed to fetch high scores", e); }
-  }, []);
+      console.log("High scores fetched:", scores.length);
+      setHighScores(scores || []);
+      
+      // Auto-Sync Database scores to LocalStorage for current user
+      if (user && scores) {
+        ['spaceship', 'basketball', 'protect'].forEach(gameId => {
+          const myBest = scores.find(s => s.game_id === gameId && s.user_email === user.email);
+          if (myBest) {
+            const local = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
+            if (myBest.score > local) {
+              console.log(`Syncing ${gameId} high score: ${myBest.score}`);
+              localStorage.setItem(`${gameId}_highscore`, myBest.score.toString());
+            }
+          }
+        });
+      }
+    } catch (e: any) { 
+      console.error("Failed to fetch high scores from Supabase:", e.message); 
+      // This is a sign the high_scores table might not exist yet
+      if (e.message?.includes('does not exist')) {
+        console.warn("TIP: Please run the high_scores table SQL in your Supabase dashboard!");
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     fetchHighScores();
