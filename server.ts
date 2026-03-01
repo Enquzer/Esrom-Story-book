@@ -104,7 +104,7 @@ app.post("/api/generate-story", async (req, res) => {
     };
 
     const response = await genAI.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-preview",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
       config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema },
     }) as any;
@@ -144,7 +144,7 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-image-preview",
       contents: { parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] },
       config: { responseModalities: [Modality.IMAGE] },
     }) as any;
@@ -171,7 +171,7 @@ app.post("/api/generate-image", async (req, res) => {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-image-preview",
       contents: { parts },
       config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: "4:3" } },
     }) as any;

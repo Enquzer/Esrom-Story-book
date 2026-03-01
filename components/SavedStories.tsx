@@ -7,20 +7,12 @@ interface SavedStoriesProps {
   onLoad: (story: SavedStory) => void;
   onDelete: (id: string) => void;
   language: Language;
-  onHome: () => void;
 }
 
-const SavedStories: React.FC<SavedStoriesProps> = ({ stories, onLoad, onDelete, language, onHome }) => {
+const SavedStories: React.FC<SavedStoriesProps> = ({ stories, onLoad, onDelete, language }) => {
     const t = translations[language];
     return (
-        <div className="w-full max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl space-y-6 relative">
-            <button 
-                onClick={onHome} 
-                className="absolute top-6 left-6 text-2xl bg-blue-50 hover:bg-blue-100 p-2 rounded-full transition-all text-blue-600 shadow-sm z-10"
-                title={t.home}
-            >
-                📚
-            </button>
+        <div className="w-full max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-center text-slate-800 tracking-tight">{t.yourLibrary}</h2>
             {stories.length === 0 ? (
                 <p className="text-center text-slate-500 py-8">{t.noAdventures}</p>
@@ -34,7 +26,7 @@ const SavedStories: React.FC<SavedStoriesProps> = ({ stories, onLoad, onDelete, 
                                 <p className="text-sm text-slate-500">{story.character.name}</p>
                             </div>
                             <div className="flex gap-2 mt-4">
-                                <button onClick={() => onLoad(story)} className="grow bg-green-500 text-white font-semibold py-2 px-4 rounded hover:bg-green-600">{t.readAgain}</button>
+                                <button onClick={() => onLoad(story)} className="flex-grow bg-green-500 text-white font-semibold py-2 px-4 rounded hover:bg-green-600">{t.readAgain}</button>
                                 <button onClick={() => onDelete(story.id)} className="bg-red-500 text-white font-semibold py-2 px-4 rounded hover:bg-red-600">{t.delete}</button>
                             </div>
                         </div>
