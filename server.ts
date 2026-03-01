@@ -251,7 +251,7 @@ app.post("/api/generate-story", async (req, res) => {
 
     const result = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
         config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema as any },
       })
@@ -329,7 +329,7 @@ app.post("/api/generate-phase-1", async (req, res) => {
     // Step 1: Generate story text (fast, ~2-3s)
     const textResult = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: [{ role: "user", parts: [{ text: `Write a 6-page story about ${character?.name} based on: ${storyPrompt}` }] }],
         config: { systemInstruction, responseMimeType: "application/json", responseSchema: storySchema as any },
       })
@@ -404,7 +404,7 @@ app.post("/api/generate-speech", async (req, res) => {
     const { text } = req.body;
     const response = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: [{ role: "user", parts: [{ text }] }],
         config: {
           responseModalities: ["AUDIO"] as any,
@@ -425,10 +425,11 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const { image } = req.body;
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
-    // gemini-2.0-flash-preview-image-generation supports image INPUT + IMAGE OUTPUT
+    // gemini-2.0-flash supports image INPUT + IMAGE OUTPUT in some modalities?
+    // Let's use it for the task.
     const response = await withKeyRotation(client =>
       client.models.generateContent({
-        model: "gemini-2.0-flash-preview-image-generation",
+        model: "gemini-2.0-flash",
         contents: [{ role: "user", parts: [
           { inlineData: { mimeType, data } },
           { text: "Transform this person into a cute, vibrant 3D Pixar animated movie character. Keep the face recognizable. Style: child-friendly storybook illustration, soft warm lighting, magical atmosphere." }
