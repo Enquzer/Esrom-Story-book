@@ -17,52 +17,89 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.resolve("./public")));
 
 // --- Simple Persistence Layer ---
-const DATA_DIR = process.env.VERCEL ? "/tmp/data" : path.resolve("./data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-
+const DATA_DIR = process.env.VERCEL ? "/tmp" : path.resolve("./data");
 const CREDITS_FILE = path.join(DATA_DIR, "credits.json");
 
 function getCredits() {
-  if (!fs.existsSync(CREDITS_FILE)) return {};
   try {
-    return JSON.parse(fs.readFileSync(CREDITS_FILE, "utf-8"));
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(CREDITS_FILE)) return {};
+    const content = fs.readFileSync(CREDITS_FILE, "utf-8");
+    if (!content.trim()) return {};
+    return JSON.parse(content);
   } catch (e) {
+    console.error("Error reading credits:", e);
     return {};
   }
 }
 
 function saveCredits(credits: any) {
-  fs.writeFileSync(CREDITS_FILE, JSON.stringify(credits, null, 2));
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(CREDITS_FILE, JSON.stringify(credits, null, 2));
+    return true;
+  } catch (e) {
+    console.error("Error saving credits:", e);
+    return false;
+  }
 }
 
-function getUserCredits(email: string) {
-  const credits = getCredits();
+function getOrInitUserCredits(credits: any, email: string) {
   const today = new Date().toISOString().split("T")[0];
   if (!credits[email] || credits[email].date !== today) {
-    credits[email] = { date: today, amount: 10 }; // 10 credits per day
-    saveCredits(credits);
+    credits[email] = { date: today, amount: 10 };
   }
   return credits[email];
+}
+
+function checkCredits(email: string, amount: number) {
+  const credits = getCredits();
+  const userCredits = getOrInitUserCredits(credits, email);
+  return userCredits.amount >= amount;
+}
+
+function deductCredits(email: string, amount: number) {
+  const credits = getCredits();
+  const userCredits = getOrInitUserCredits(credits, email);
+  userCredits.amount -= amount;
+  return saveCredits(credits);
 }
 
 // --- API Routes ---
 
 app.get("/api/credits", (req, res) => {
-  const email = (req.query.email as string) || "guest";
-  res.json(getUserCredits(email));
+  try {
+    const email = (req.query.email as string) || "guest";
+    const credits = getCredits();
+    const userCredits = getOrInitUserCredits(credits, email);
+    // Auto-save if we initialized new credits
+    saveCredits(credits);
+    res.json(userCredits);
+  } catch (e: any) {
+    console.error("GET credits error:", e);
+    res.status(500).json({ error: "Could not fetch credits" });
+  }
 });
 
 app.post("/api/credits/use", (req, res) => {
-  const { email = "guest", amount = 1 } = req.body;
-  const credits = getCredits();
-  const userCredits = getUserCredits(email);
+  try {
+    const { email = "guest", amount = 1 } = req.body;
+    const credits = getCredits();
+    const userCredits = getOrInitUserCredits(credits, email);
 
-  if (userCredits.amount >= amount) {
-    credits[email].amount -= amount;
-    saveCredits(credits);
-    return res.json({ success: true, remaining: credits[email].amount });
+    if (userCredits.amount >= amount) {
+      userCredits.amount -= amount;
+      if (saveCredits(credits)) {
+        return res.json({ success: true, remaining: userCredits.amount });
+      } else {
+        throw new Error("Failed to write to disk");
+      }
+    }
+    res.status(403).json({ error: "Not enough magic credits!" });
+  } catch (e: any) {
+    console.error("POST use credits error:", e);
+    res.status(500).json({ error: "Internal credit system error" });
   }
-  res.status(403).json({ error: "Not enough magic credits!" });
 });
 
 // --- Gemini AI Proxy Routes ---
@@ -73,8 +110,7 @@ app.post("/api/generate-story", async (req, res) => {
     const { character, language, storyPrompt, email = "guest" } = req.body;
     
     // Validate credits
-    const userCredits = getUserCredits(email);
-    if (userCredits.amount < 1) {
+    if (!checkCredits(email, 1)) {
       return res.status(403).json({ error: "Not enough magic credits!" });
     }
 
@@ -125,9 +161,7 @@ app.post("/api/generate-story", async (req, res) => {
     console.log("Gemini Response received");
 
     // Deduct credit only on success
-    const credits = getCredits();
-    credits[email].amount -= 1;
-    saveCredits(credits);
+    deductCredits(email, 1);
 
     res.json(JSON.parse(text));
   } catch (error: any) {
@@ -182,8 +216,7 @@ app.post("/api/generate-image", async (req, res) => {
     const { prompt, characterImage, email = "guest" } = req.body;
     
     // Validate credits
-    const userCredits = getUserCredits(email);
-    if (userCredits.amount < 0.5) {
+    if (!checkCredits(email, 0.5)) {
       return res.status(403).json({ error: "Not enough magic credits!" });
     }
 
@@ -207,9 +240,7 @@ app.post("/api/generate-image", async (req, res) => {
     if (!part) return res.status(500).json({ error: "No image data" });
 
     // Deduct credit
-    const credits = getCredits();
-    credits[email].amount -= 0.5;
-    saveCredits(credits);
+    deductCredits(email, 0.5);
 
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
