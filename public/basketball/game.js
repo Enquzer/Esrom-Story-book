@@ -65,6 +65,11 @@ function create() {
         fontSize: '20px', fontFamily: 'Arial Black', fill: '#f1c40f', stroke: '#000', strokeThickness: 4 
     }).setDepth(100);
 
+    scene.highScore = parseInt(localStorage.getItem('basketball_highscore') || '0');
+    scene.highScoreText = scene.add.text(20, 45, 'BEST: ' + scene.highScore, { 
+        fontSize: '12px', fontFamily: 'Arial Black', fill: '#ffffff', stroke: '#000', strokeThickness: 2 
+    }).setAlpha(0.7).setDepth(100);
+
     scene.livesText = scene.add.text(width - 20, 20, '❤️x5', { 
         fontSize: '20px', fontFamily: 'Arial Black', fill: '#e74c3c', stroke: '#000', strokeThickness: 4 
     }).setOrigin(1, 0).setDepth(100);
@@ -238,6 +243,14 @@ function create() {
                     scene.updateLivesDisplay();
                     if (scene.lives <= 0) {
                         scene.gameOver = true;
+                        
+                        // Check local high score
+                        if (scene.score > scene.highScore) {
+                            scene.highScore = scene.score;
+                            localStorage.setItem('basketball_highscore', scene.score.toString());
+                            scene.highScoreText.setText('BEST: ' + scene.highScore);
+                        }
+
                         showFeedback(scene, 'GAME OVER', width/2, height/2, 5000);
                         scene.add.text(width/2, height/2 + 80, 'Final Score: ' + scene.score, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
                         

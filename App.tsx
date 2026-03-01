@@ -349,24 +349,32 @@ function App() {
                 </h3>
                 <div className="space-y-3">
                   {['spaceship', 'basketball', 'protect'].map(gameId => {
+                    // Global Champ from Database
                     const top = highScores.filter(s => s.game_id === gameId).slice(0, 1)[0];
-                    const mine = highScores.filter(s => s.game_id === gameId && s.user_email === user?.email).slice(0, 1)[0];
+                    
+                    // Personal Best from LocalStorage (Matches user's "like spaceship" request)
+                    const localBest = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
+                    
                     return (
-                      <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5 hover:bg-black/30 transition-all">
+                      <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5 hover:bg-black/30 transition-all group">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl">
+                          <span className="text-xl group-hover:scale-125 transition-transform duration-300">
                             {gameId === 'spaceship' ? '🚀' : gameId === 'basketball' ? '🏀' : '🛡️'}
                           </span>
                           <div>
                             <div className="text-white/90 font-bold capitalize text-sm">{gameId}</div>
-                            <div className="text-white/30 text-[9px] uppercase font-medium">
-                              {mine ? `Your Best: ${mine.score}` : 'No score yet'}
+                            <div className="text-white/40 text-[9px] uppercase font-bold tracking-wider">
+                              {localBest > 0 ? `Your Best: ${localBest}` : 'No local score'}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-amber-400 font-black text-sm">🏆 {top ? top.score : 0}</div>
-                          <div className="text-white/40 text-[9px] truncate max-w-[100px]">{top ? top.user_email : 'No champ yet'}</div>
+                          <div className="text-amber-400 font-black text-sm flex items-center justify-end gap-1">
+                            <span className="text-[10px]">🏆</span> {top ? top.score : 0}
+                          </div>
+                          <div className="text-white/20 text-[8px] truncate max-w-[120px] font-mono italic">
+                            {top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'No champ yet'}
+                          </div>
                         </div>
                       </div>
                     );

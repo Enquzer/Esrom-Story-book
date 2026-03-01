@@ -32,7 +32,8 @@ let enemies = [];
 let missiles = [];
 let particles = [];
 let buildings = [];
-let scoreText, healthText, chargeBar, chargeLabel, domeBtn;
+let scoreText, healthText, highText, chargeBar, chargeLabel, domeBtn;
+let bestScore = parseInt(localStorage.getItem('protect_highscore') || '0');
 
 // Charge / Electric Dome
 let chargeMs = 0;          // ms accumulated without taking damage
@@ -79,7 +80,8 @@ function create() {
 
     // UI Text
     scoreText  = scene.add.text(16, 12, 'SCORE: 0',              { font: 'bold 16px monospace', fill: '#00ffff' }).setDepth(10);
-    healthText = scene.add.text(16, 34, 'LIFE: 100%',            { font: 'bold 16px monospace', fill: '#00ff88' }).setDepth(10);
+    highText   = scene.add.text(16, 32, 'BEST: ' + bestScore,    { font: 'bold 11px monospace', fill: '#ffffff', alpha: 0.6 }).setDepth(10);
+    healthText = scene.add.text(16, 50, 'LIFE: 100%',            { font: 'bold 16px monospace', fill: '#00ff88' }).setDepth(10);
     scene.add.text(W / 2, H - 12, 'DOME: TAP BUTTON or E KEY',  { font: '10px monospace', fill: '#334466' }).setDepth(10).setOrigin(0.5);
 
     // Charge Bar UI
@@ -466,6 +468,12 @@ function triggerGameOver(scene) {
     scene.add.text(W / 2, H / 2 + 10,  'FINAL SCORE: ' + score,   { font: 'bold 28px monospace', fill: '#00ffff' }).setOrigin(0.5).setDepth(21);
     scene.add.text(W / 2, H / 2 + 65, 'Click to restart',          { font: '18px monospace',     fill: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
     
+    if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('protect_highscore', score.toString());
+        if (highText) highText.setText('BEST: ' + bestScore);
+    }
+
     // Report score to parent
     if (window.parent) {
         window.parent.postMessage({ type: 'GAME_OVER', gameId: 'protect', score: score }, '*');
