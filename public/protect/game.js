@@ -3,7 +3,7 @@
 // Features: Electric Dome charge weapon, Cluster Bomb enemies
 // ============================================================
 
-const W = 800, H = 600;
+const W = 400, H = 600;
 const GROUND_Y = H - 30;
 const CANNON_X = W / 2;
 const CHARGE_DURATION = 8000; // 8 seconds of no-hit to charge dome
@@ -59,11 +59,11 @@ function create() {
 
     // Skyscrapers
     const defs = [
-        { x: 100,  w: 65,  h: 200, color: 0x112288 },
-        { x: 230,  w: 85,  h: 300, color: 0x1133aa },
-        { x: 390,  w: 75,  h: 155, color: 0x0d2266 },
-        { x: 545,  w: 85,  h: 330, color: 0x1144bb },
-        { x: 690,  w: 65,  h: 230, color: 0x0f2299 },
+        { x: 50,  w: 40,  h: 180, color: 0x112288 },
+        { x: 130, w: 50,  h: 280, color: 0x1133aa },
+        { x: 200, w: 45,  h: 140, color: 0x0d2266 },
+        { x: 270, w: 55,  h: 310, color: 0x1144bb },
+        { x: 350, w: 40,  h: 210, color: 0x0f2299 },
     ];
     defs.forEach(d => createBuilding(scene, d));
 
@@ -78,9 +78,9 @@ function create() {
     createCannon(scene);
 
     // UI Text
-    scoreText  = scene.add.text(16, 12, 'SCORE: 0',              { font: 'bold 20px monospace', fill: '#00ffff' }).setDepth(10);
-    healthText = scene.add.text(16, 38, 'CITY INTEGRITY: 100%',  { font: 'bold 20px monospace', fill: '#00ff88' }).setDepth(10);
-    scene.add.text(W / 2, H - 12, 'CLICK TO FIRE  |  E KEY or DOME BUTTON = ELECTRIC DOME', { font: '11px monospace', fill: '#334466' }).setDepth(10).setOrigin(0.5);
+    scoreText  = scene.add.text(16, 12, 'SCORE: 0',              { font: 'bold 16px monospace', fill: '#00ffff' }).setDepth(10);
+    healthText = scene.add.text(16, 34, 'LIFE: 100%',            { font: 'bold 16px monospace', fill: '#00ff88' }).setDepth(10);
+    scene.add.text(W / 2, H - 12, 'DOME: TAP BUTTON or E KEY',  { font: '10px monospace', fill: '#334466' }).setDepth(10).setOrigin(0.5);
 
     // Charge Bar UI
     chargeLabel = scene.add.text(W - 16, 12, 'DOME: CHARGING...', { font: 'bold 14px monospace', fill: '#556677' }).setDepth(10).setOrigin(1, 0);

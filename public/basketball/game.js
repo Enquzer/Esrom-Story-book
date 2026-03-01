@@ -1,6 +1,6 @@
 const config = {
     type: Phaser.AUTO,
-    width: 800,
+    width: 400,
     height: 600,
     backgroundColor: '#0a0a12',
     parent: 'game-container',
@@ -61,12 +61,12 @@ function create() {
     scene.lives = 5;
     scene.gameOver = false;
 
-    scene.scoreText = scene.add.text(40, 40, 'SCORE: 0', { 
-        fontSize: '32px', fontFamily: 'Arial Black', fill: '#f1c40f', stroke: '#000', strokeThickness: 6 
+    scene.scoreText = scene.add.text(20, 20, 'SCORE: 0', { 
+        fontSize: '20px', fontFamily: 'Arial Black', fill: '#f1c40f', stroke: '#000', strokeThickness: 4 
     }).setDepth(100);
 
-    scene.livesText = scene.add.text(width - 40, 40, 'LIVES: ❤️❤️❤️❤️❤️', { 
-        fontSize: '24px', fontFamily: 'Arial Black', fill: '#e74c3c', stroke: '#000', strokeThickness: 4 
+    scene.livesText = scene.add.text(width - 20, 20, '❤️x5', { 
+        fontSize: '20px', fontFamily: 'Arial Black', fill: '#e74c3c', stroke: '#000', strokeThickness: 4 
     }).setOrigin(1, 0).setDepth(100);
 
     // Physics Boundaries (Invisible Walls)
@@ -80,9 +80,9 @@ function create() {
     scene.matter.add.gameObject(floor, { isStatic: true, restitution: 0.8, label: 'floor' });
 
     // --- HOOP SETUP ---
-    const hoopX = width - 200;
-    const hoopY = 280;
-    const rimWidth = 90;
+    const hoopX = width - 80;
+    const hoopY = 220;
+    const rimWidth = 70;
 
     // Backboard
     const bb = scene.add.rectangle(hoopX + rimWidth / 2 + 20, hoopY - 80, 20, 180, 0xffffff).setOrigin(0.5);
@@ -151,16 +151,14 @@ function create() {
     scene.isMoving = false;
 
     scene.updateLivesDisplay = () => {
-        let hearts = '';
-        for(let i=0; i<5; i++) hearts += i < scene.lives ? '❤️' : '🖤';
-        scene.livesText.setText('LIVES: ' + hearts);
+        scene.livesText.setText('❤️x' + scene.lives);
     };
 
     scene.spawnBall = () => {
         if (scene.gameOver) return;
         if (scene.ball) scene.ball.destroy();
         
-        scene.ball = scene.add.image(150, 480, 'ball').setDepth(10);
+        scene.ball = scene.add.image(80, 450, 'ball').setDepth(10);
         scene.matter.add.gameObject(scene.ball, {
             shape: 'circle', radius: 20, restitution: 0.8, friction: 0.05, label: 'ball', mass: 1
         });
