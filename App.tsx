@@ -388,10 +388,19 @@ function App() {
                 
                 <div className="space-y-3">
                   {['spaceship', 'basketball', 'protect'].map(gameId => {
-                    const top = highScores ? highScores.filter(s => s.game_id === gameId).sort((a,b) => b.score - a.score)[0] : null;
+                    const cloudTop = highScores ? highScores.filter(s => s.game_id === gameId).sort((a,b) => b.score - a.score)[0] : null;
                     const dbBest = highScores ? highScores.find(s => s.game_id === gameId && s.user_email === user?.email) : null;
                     const localBest = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
                     const displayBest = Math.max(localBest, dbBest?.score || 0);
+
+                    // TRUE champ: if local best beats the cloud top, WE are the champ
+                    const trueChampScore = Math.max(cloudTop?.score || 0, displayBest);
+                    const isLocalBestChamp = displayBest > 0 && displayBest >= trueChampScore;
+                    
+                    // If local best hasn't synced to cloud, push it now silently
+                    if (localBest > 0 && (!dbBest || localBest > (dbBest?.score || 0)) && highScores !== null) {
+                      updateHighScore(gameId, localBest).then(isNew => { if (isNew) fetchHighScores(); });
+                    }
                     
                     return (
                       <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5 hover:bg-black/30 transition-all group">
@@ -402,16 +411,20 @@ function App() {
                           <div>
                             <div className="text-white/90 font-bold capitalize text-sm">{gameId}</div>
                             <div className="text-white/40 text-[9px] uppercase font-bold tracking-wider">
-                              {displayBest > 0 ? `Your Best: ${displayBest}` : 'No score yet'}
+                              {displayBest > 0 ? `Your Best: ${displayBest.toLocaleString()}` : 'No score yet'}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-amber-400 font-black text-sm flex items-center justify-end gap-1">
-                            <span className="text-[10px]">🏆</span> {top ? top.score : (highScores === null ? '...' : 0)}
+                          <div className={`font-black text-sm flex items-center justify-end gap-1 ${isLocalBestChamp ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            <span className="text-[10px]">🏆</span> {trueChampScore > 0 ? trueChampScore.toLocaleString() : (highScores === null ? '...' : 0)}
                           </div>
                           <div className="text-white/20 text-[8px] truncate max-w-[120px] font-mono italic">
-                            {highScores === null ? 'Searching...' : (top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : maskEmail(top.user_email)) : 'No cloud record')}
+                            {highScores === null 
+                              ? 'Searching...' 
+                              : isLocalBestChamp 
+                                ? '✨ You are Champ! ✨' 
+                                : (cloudTop ? maskEmail(cloudTop.user_email) : 'No cloud record')}
                           </div>
                         </div>
                       </div>
