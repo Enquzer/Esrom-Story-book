@@ -281,9 +281,9 @@ function App() {
         <header className="text-center mb-8 flex flex-col items-center no-print">
           <div className="w-full max-w-lg mb-4 drop-shadow-2xl">
             <img 
-              src="/logo.png" 
+              src="/protect/logo.png" 
               alt="StorySpark Logo" 
-              className="w-full h-auto object-contain"
+              className="w-full h-auto max-h-32 object-contain mx-auto"
             />
             
             {/* Background elements for the welcome screen */}
