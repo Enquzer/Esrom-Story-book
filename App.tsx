@@ -366,24 +366,28 @@ function App() {
           
           {activeGame === 'spaceship' && <SpaceshipGame onBack={() => setActiveGame('none')} language={language} />}
           {activeGame === 'basketball' && (
-            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-4xl aspect-4/3 bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col">
-                <div className="bg-slate-800 p-2 flex justify-between items-center px-6">
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/95 backdrop-blur-xl p-0 md:p-4">
+              <div className="relative w-full h-full md:h-auto md:max-w-4xl md:aspect-4/3 bg-slate-900 md:rounded-3xl overflow-hidden border-0 md:border-4 border-slate-700 shadow-2xl flex flex-col">
+                <div className="bg-slate-800 p-2 flex justify-between items-center px-6 shrink-0">
                   <span className="text-white font-bold text-sm">🏀 2D Basketball Physics</span>
-                  <button onClick={() => setActiveGame('none')} className="bg-white/10 hover:bg-white/20 text-white px-4 py-1 rounded-full text-xs font-bold">Close</button>
+                  <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold transition-all">Close</button>
                 </div>
-                <iframe src="/basketball/index.html" className="w-full h-full border-none" title="Basketball Game" />
+                <div className="grow w-full h-full relative">
+                   <iframe src="/basketball/index.html" className="absolute inset-0 w-full h-full border-none" title="Basketball Game" />
+                </div>
               </div>
             </div>
           )}
           {activeGame === 'protect' && (
-            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-4xl aspect-4/3 bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col">
-                <div className="bg-slate-800 p-2 flex justify-between items-center px-6">
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/95 backdrop-blur-xl p-0 md:p-4">
+              <div className="relative w-full h-full md:h-auto md:max-w-4xl md:aspect-4/3 bg-slate-900 md:rounded-3xl overflow-hidden border-0 md:border-4 border-slate-700 shadow-2xl flex flex-col">
+                <div className="bg-slate-800 p-2 flex justify-between items-center px-6 shrink-0">
                   <span className="text-white font-bold text-sm">🛡️ Protect - Defense & Fracture Physics</span>
-                  <button onClick={() => setActiveGame('none')} className="bg-white/10 hover:bg-white/20 text-white px-4 py-1 rounded-full text-xs font-bold">Close</button>
+                  <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold transition-all">Close</button>
                 </div>
-                <iframe src="/protect/index.html" className="w-full h-full border-none" title="Protect Game" />
+                <div className="grow w-full h-full relative">
+                   <iframe src="/protect/index.html" className="absolute inset-0 w-full h-full border-none" title="Protect Game" />
+                </div>
               </div>
             </div>
           )}

@@ -14,6 +14,10 @@ const config = {
     height: H,
     backgroundColor: '#050510',
     parent: 'protect-container',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     scene: { create, update }
 };
 

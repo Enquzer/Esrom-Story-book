@@ -4,6 +4,10 @@ const config = {
     height: 600,
     backgroundColor: '#0a0a12',
     parent: 'game-container',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'matter',
         matter: {
