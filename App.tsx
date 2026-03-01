@@ -339,52 +339,6 @@ function App() {
         <div id="stars3" className="stars" />
       </div>
 
-      {(isQuotaExhausted || isGeminiQuotaExhausted) && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-slate-900 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]">
-            <div className="text-6xl mb-4 animate-bounce">✨</div>
-            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-linear-to-r from-purple-400 to-pink-400">Our Magic Engine is Napping!</h2>
-            <p className="text-slate-400 mb-6 text-sm">Our story units are taking a quick break to restore their sparkle. Please visit your library or play one of our games in the meantime!</p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} 
-                className="w-full py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-black text-lg transition-all shadow-[0_4px_20px_rgba(147,51,234,0.4)]"
-              >
-                📚 {t.library}
-              </button>
-              
-              <div className="space-y-2 mt-2">
-                <button 
-                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} 
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition-all border-b-4 border-indigo-800 flex items-center justify-center gap-2"
-                >
-                  🚀 {t.playSpaceship}
-                </button>
-                <button 
-                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('basketball'); }} 
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-400 rounded-xl font-bold transition-all border-b-4 border-orange-700 flex items-center justify-center gap-2"
-                >
-                  🏀 {t.playBasketball}
-                </button>
-                <button 
-                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('protect'); }} 
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all border-b-4 border-emerald-800 flex items-center justify-center gap-2"
-                >
-                  🛡️ {t.playProtect}
-                </button>
-              </div>
-              
-              <button 
-                onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); }} 
-                className="mt-2 w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-bold uppercase tracking-widest transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isHomeScreen && <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-50"><Spaceship /></div>}
 
       <div className={`relative z-10 min-h-screen transition-colors duration-500 ${isHomeScreen ? 'bg-transparent' : 'bg-slate-50'}`}>
