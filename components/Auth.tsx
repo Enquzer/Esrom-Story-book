@@ -371,9 +371,9 @@ export default function Auth() {
         <div className="flex justify-center mb-8 h-20 items-center">
           {!logoError ? (
             <img 
-              src="/logo.png?v=3" 
+              src="/logo.png" 
               alt="StorySpark" 
-              className="max-h-full w-auto object-contain"
+              className="max-h-full w-auto object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]"
               onError={() => {
                 console.error("Auth logo failed, using text fallback");
                 setLogoError(true);

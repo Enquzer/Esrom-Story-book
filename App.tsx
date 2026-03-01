@@ -283,7 +283,7 @@ function App() {
             <img 
               src="/logo.png" 
               alt="StorySpark Logo" 
-              className="w-full h-auto max-h-32 object-contain mx-auto"
+              className="w-full h-auto max-h-32 object-contain mx-auto drop-shadow-2xl"
             />
             
             {/* Background elements for the welcome screen */}
