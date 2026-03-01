@@ -281,10 +281,9 @@ function App() {
         <header className="text-center mb-8 flex flex-col items-center no-print">
           <div className="w-full max-w-lg mb-4 drop-shadow-2xl">
             <img 
-              src="https://storage.googleapis.com/applet-assets/storyspark-logo.png" 
+              src="/logo.png" 
               alt="StorySpark Logo" 
               className="w-full h-auto object-contain"
-              referrerPolicy="no-referrer"
             />
             
             {/* Background elements for the welcome screen */}
