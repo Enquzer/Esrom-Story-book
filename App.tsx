@@ -304,12 +304,24 @@ function App() {
           <img src="/logo.png" alt="Logo" className="w-full max-w-[300px] drop-shadow-2xl" />
           {isHomeScreen && (
             <div className="flex flex-col items-center gap-3">
-              {credits && <div className="bg-white/10 backdrop-blur-md px-4 py-1 rounded-full text-white text-sm font-bold">✨ {credits.amount} Credits</div>}
-              <div className="flex gap-4">
-                <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30">
+              <div className="flex flex-col items-center gap-1 mb-2">
+                <div className="text-white/60 text-[10px] uppercase font-bold tracking-widest">Active Explorer</div>
+                <div className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-2xl text-white text-xs font-medium backdrop-blur-sm">
+                  👤 {user?.email}
+                </div>
+              </div>
+
+              {credits && <div className="bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-1.5 rounded-full text-black text-xs font-black shadow-lg shadow-orange-950/20 animate-pulse">
+                ✨ {credits.amount} Credits
+              </div>}
+              
+              <div className="flex gap-4 mt-2">
+                <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition-all text-sm">
                   {view === 'input' ? '📚 Library' : '✍️ Create'}
                 </button>
-                <button onClick={() => supabase.auth.signOut()} className="bg-red-500/20 backdrop-blur-md border border-red-500/30 text-white font-bold py-2 px-6 rounded-full hover:bg-red-500/40">🚪 Logout</button>
+                <button onClick={() => supabase.auth.signOut()} className="bg-red-500/10 backdrop-blur-md border border-red-500/30 text-red-100 font-bold py-2 px-6 rounded-full hover:bg-red-500/30 transition-all text-sm">
+                  🚪 Logout
+                </button>
               </div>
             </div>
           )}
