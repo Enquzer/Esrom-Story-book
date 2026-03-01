@@ -147,7 +147,7 @@ app.post("/api/generate-story", async (req, res) => {
 
     console.log("Generating story with prompt:", storyPrompt);
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
       config: { 
         systemInstruction,
@@ -166,7 +166,11 @@ app.post("/api/generate-story", async (req, res) => {
     res.json(JSON.parse(text));
   } catch (error: any) {
     console.error("Gemini generate-story DETAIL:", error);
-    res.status(500).json({ error: "Failed to generate story: " + (error.message || "AI engine error") });
+    const statusCode = error.status || error.code || 500;
+    const errorMessage = error.message || "AI engine error";
+    res.status(statusCode === 429 ? 429 : 500).json({ 
+      error: statusCode === 429 ? "Daily magic quota exceeded! Please try again in a few minutes or tomorrow." : "Failed to generate story: " + errorMessage 
+    });
   }
 });
 
@@ -175,7 +179,7 @@ app.post("/api/generate-speech", async (req, res) => {
   try {
     const { text } = req.body;
     const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO] as any,
@@ -197,7 +201,7 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
     const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] }],
       config: { responseModalities: [Modality.IMAGE] as any },
     });
@@ -231,7 +235,7 @@ app.post("/api/generate-image", async (req, res) => {
     }
 
     const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts }],
       config: { responseModalities: [Modality.IMAGE] as any },
     });
