@@ -70,7 +70,14 @@ app.post("/api/credits/use", (req, res) => {
 /** POST /api/generate-story  { character, language, storyPrompt } */
 app.post("/api/generate-story", async (req, res) => {
   try {
-    const { character, language, storyPrompt } = req.body;
+    const { character, language, storyPrompt, email = "guest" } = req.body;
+    
+    // Validate credits
+    const userCredits = getUserCredits(email);
+    if (userCredits.amount < 1) {
+      return res.status(403).json({ error: "Not enough magic credits!" });
+    }
+
     const langName = language === "am" ? "Amharic" : "English";
     const systemInstruction = `You are a master storyteller for children. Write a story about ${character?.name} based on: ${storyPrompt}. Language: ${langName}. Return JSON.`;
 
@@ -103,10 +110,23 @@ app.post("/api/generate-story", async (req, res) => {
     };
 
     const response = await genAI.models.generateContent({
-      model: "gemini-3.1-flash-preview",
+      model: "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
-      config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema },
+      config: { 
+        systemInstruction, 
+        responseMimeType: "application/json", 
+        responseSchema: fullStorySchema as any 
+      },
     }) as any;
+
+    if (!response.text) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    // Deduct credit only on success
+    const credits = getCredits();
+    credits[email].amount -= 1;
+    saveCredits(credits);
 
     res.json(JSON.parse(response.text.trim()));
   } catch (error: any) {
@@ -121,11 +141,11 @@ app.post("/api/generate-speech", async (req, res) => {
   try {
     const { text } = req.body;
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text }] }],
       config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } },
+        responseModalities: [Modality.AUDIO] as any,
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } as any,
       },
     }) as any;
     const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
@@ -143,11 +163,11 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
     const response = await genAI.models.generateContent({
-      model: "gemini-3.1-flash-image-preview",
-      contents: { parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] },
-      config: { responseModalities: [Modality.IMAGE] },
+      model: "gemini-2.0-flash",
+      contents: [{ parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] }],
+      config: { responseModalities: [Modality.IMAGE] as any },
     }) as any;
-    const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part) return res.status(500).json({ error: "No image generated" });
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
@@ -159,7 +179,14 @@ app.post("/api/cartoonize-image", async (req, res) => {
 /** POST /api/generate-image  { prompt, characterImage?: base64DataUrl } */
 app.post("/api/generate-image", async (req, res) => {
   try {
-    const { prompt, characterImage } = req.body;
+    const { prompt, characterImage, email = "guest" } = req.body;
+    
+    // Validate credits
+    const userCredits = getUserCredits(email);
+    if (userCredits.amount < 0.5) {
+      return res.status(403).json({ error: "Not enough magic credits!" });
+    }
+
     const parts: any[] = [];
     if (characterImage) {
       const mimeType = characterImage.substring(5, characterImage.indexOf(";"));
@@ -169,13 +196,21 @@ app.post("/api/generate-image", async (req, res) => {
     } else {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
+
     const response = await genAI.models.generateContent({
-      model: "gemini-3.1-flash-image-preview",
-      contents: { parts },
-      config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: "4:3" } },
+      model: "gemini-2.0-flash",
+      contents: [{ role: "user", parts }],
+      config: { responseModalities: [Modality.IMAGE] as any },
     }) as any;
-    const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
+
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part) return res.status(500).json({ error: "No image data" });
+
+    // Deduct credit
+    const credits = getCredits();
+    credits[email].amount -= 0.5;
+    saveCredits(credits);
+
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
     console.error("Gemini generate-image error:", error);
