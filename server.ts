@@ -106,7 +106,7 @@ app.post("/api/credits/use", (req, res) => {
 app.post("/api/generate-story", async (req, res) => {
   try {
     const { character, language, storyPrompt, email = "guest" } = req.body;
-    if (!checkCredits(email, 1)) return res.status(403).json({ error: "Not enough magic credits!" });
+    if (!checkCredits(email, 1)) return res.status(403).json({ error: "Insufficient credits" });
 
     const langName = language === "am" ? "Amharic" : "English";
     const systemInstruction = `You are a master storyteller for children. Write a story about ${character?.name} based on: ${storyPrompt}. Language: ${langName}. Return JSON.`;
@@ -139,38 +139,42 @@ app.post("/api/generate-story", async (req, res) => {
       required: ["title", "pages"],
     };
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", systemInstruction });
-    const result = await model.generateContent({
+    const result = await genAI.models.generateContent({
+      model: "gemini-1.5-flash-latest",
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: fullStorySchema as any },
+      config: { 
+        systemInstruction,
+        responseMimeType: "application/json", 
+        responseSchema: fullStorySchema as any
+      },
     });
 
-    const text = result.response.text();
+    const text = result.text;
+    if (!text) throw new Error("AI response empty");
     deductCredits(email, 1);
     res.json(JSON.parse(text));
   } catch (error: any) {
     console.error("Gemini generate-story error:", error);
-    const code = error.status || error.code || 500;
-    res.status(code === 429 ? 429 : 500).json({ error: error.message });
+    res.status(500).json({ error: "AI processing failure" });
   }
 });
 
 app.post("/api/generate-speech", async (req, res) => {
   try {
     const { text } = req.body;
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-1.5-flash-latest",
       contents: [{ role: "user", parts: [{ text }] }],
-      generationConfig: { 
+      config: { 
         responseModalities: ["AUDIO"] as any,
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } as any
       },
     });
-    const audioData = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
     res.json({ audioData });
   } catch (error: any) {
     console.error("Gemini speech error:", error);
-    res.status(500).json({ error: "Failed to generate speech" });
+    res.status(500).json({ error: "TTS failure" });
   }
 });
 
@@ -179,24 +183,24 @@ app.post("/api/cartoonize-image", async (req, res) => {
     const { image } = req.body;
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-1.5-flash-latest",
       contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] }],
-      generationConfig: { responseModalities: ["IMAGE"] as any },
+      config: { responseModalities: ["IMAGE"] as any },
     });
-    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-    if (!part) return res.status(500).json({ error: "No image generated" });
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    if (!part) throw new Error("Imaging failure");
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
     console.error("Gemini cartoonize error:", error);
-    res.status(500).json({ error: "Failed to cartoonize image" });
+    res.status(500).json({ error: "Imaging processing failure" });
   }
 });
 
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt, characterImage, email = "guest" } = req.body;
-    if (!checkCredits(email, 0.5)) return res.status(403).json({ error: "Not enough magic credits!" });
+    if (!checkCredits(email, 0.5)) return res.status(403).json({ error: "Insufficient credits" });
 
     const parts: any[] = [];
     if (characterImage) {
@@ -208,19 +212,19 @@ app.post("/api/generate-image", async (req, res) => {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-1.5-flash-latest",
       contents: [{ role: "user", parts }],
-      generationConfig: { responseModalities: ["IMAGE"] as any },
+      config: { responseModalities: ["IMAGE"] as any },
     });
 
-    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-    if (!part) return res.status(500).json({ error: "No image generated" });
+    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    if (!part) throw new Error("Imaging failure");
     deductCredits(email, 0.5);
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
     console.error("Gemini image error:", error);
-    res.status(500).json({ error: "Failed to generate image" });
+    res.status(500).json({ error: "Image generation failure" });
   }
 });
 

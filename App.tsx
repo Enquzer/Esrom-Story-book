@@ -111,8 +111,6 @@ function App() {
       const email = user?.email || 'guest';
       const data = await getCredits(email);
       setCredits(data);
-      if (data.amount <= 0) setIsQuotaExhausted(true);
-      else setIsQuotaExhausted(false);
     } catch (e) { console.error("Failed to fetch credits", e); }
   }, [user]);
 
@@ -158,11 +156,8 @@ function App() {
 
     } catch (err: any) {
       console.error("Story generation failed:", err);
-      if (err.message?.includes('429') || err.message?.includes('quota')) {
-        setIsGeminiQuotaExhausted(true);
-      } else {
-        alert("Failed to generate story: " + err.message);
-      }
+      // No matter what the error is, show the friendly Napping Modal instead of an alert
+      setIsGeminiQuotaExhausted(true);
     } finally {
       setIsLoading(false);
     }
@@ -210,7 +205,8 @@ function App() {
       setStoryId(story.id);
       setView('storybook');
     } catch (e) { 
-      alert(t.failedLoadAdventure); 
+      // If load fails, we can just return home silently or show the modal
+      setIsGeminiQuotaExhausted(true); 
     } finally { 
       setIsLoading(false); 
     }
@@ -259,8 +255,8 @@ function App() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-slate-900 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]">
             <div className="text-6xl mb-4 animate-bounce">✨</div>
-            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Engine's Napping!</h2>
-            <p className="text-slate-400 mb-6 text-sm">Our story engine is taking a quick break to restore its magic. Try your library or play a game!</p>
+            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Our Magic Engine is Napping!</h2>
+            <p className="text-slate-400 mb-6 text-sm">Our story units are taking a quick break to restore their sparkle. Please visit your library or play one of our games in the meantime!</p>
             <div className="flex flex-col gap-3">
               <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold transition-all">📚 Visit Library</button>
               <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700">🚀 Play Spaceship</button>
