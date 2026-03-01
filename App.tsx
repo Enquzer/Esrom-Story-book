@@ -258,8 +258,32 @@ function App() {
             <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Our Magic Engine is Napping!</h2>
             <p className="text-slate-400 mb-6 text-sm">Our story units are taking a quick break to restore their sparkle. Please visit your library or play one of our games in the meantime!</p>
             <div className="flex flex-col gap-3">
-              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold transition-all">📚 Visit Library</button>
-              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700">🚀 Play Spaceship</button>
+              <button 
+                onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} 
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold transition-all shadow-lg shadow-purple-900/40"
+              >
+                📚 Visit Library
+              </button>
+              <div className="grid grid-cols-1 gap-2">
+                <button 
+                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} 
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                >
+                  🚀 Play Spaceship
+                </button>
+                <button 
+                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('basketball'); }} 
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                >
+                  🏀 Basketball Physics
+                </button>
+                <button 
+                  onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('protect'); }} 
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                >
+                  🛡️ Protect City
+                </button>
+              </div>
               <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); }} className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-medium">Close</button>
             </div>
           </div>
