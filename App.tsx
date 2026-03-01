@@ -416,9 +416,6 @@ function App() {
                     );
                   })}
                 </div>
-                <div className="mt-4 p-2 bg-purple-900/20 rounded-lg border border-purple-500/20 text-[8px] text-purple-300 leading-tight">
-                  <p>💡 <b>Sync Tip:</b> To ensure scores save to the cloud, make sure you ran the SQL script in your Supabase dashboard.</p>
-                </div>
               </div>
               
               <div className="flex gap-4 mt-2">
