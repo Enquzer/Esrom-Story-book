@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
@@ -18,8 +17,8 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.static("public"));
 
 // --- Simple Persistence Layer ---
-const DATA_DIR = path.resolve("./data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const DATA_DIR = process.env.VERCEL ? "/tmp/data" : path.resolve("./data");
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const CREDITS_FILE = path.join(DATA_DIR, "credits.json");
 
@@ -189,6 +188,7 @@ app.post("/api/generate-image", async (req, res) => {
 async function startServer() {
   let vite: any;
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "custom", // Changed to custom to handle HTML manually for better reliability
@@ -227,9 +227,15 @@ async function startServer() {
     }
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
