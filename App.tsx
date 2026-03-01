@@ -365,16 +365,31 @@ function App() {
 
               {/* Leaderboard Section */}
               <div className="w-full max-w-md bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-5 mt-4">
-                <h3 className="text-white/80 text-[10px] uppercase font-black tracking-widest mb-4 flex items-center gap-2">
-                  🏆 Rankings & Your Bests
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white/80 text-[10px] uppercase font-black tracking-widest flex items-center gap-2">
+                    🏆 Rankings & Your Bests
+                  </h3>
+                  <button 
+                    onClick={fetchHighScores}
+                    className="text-[10px] text-purple-400 hover:text-purple-300 font-bold uppercase tracking-tighter"
+                  >
+                    🔄 Sync Data
+                  </button>
+                </div>
+                
                 <div className="space-y-3">
                   {['spaceship', 'basketball', 'protect'].map(gameId => {
-                    // Global Champ from Database
-                    const top = highScores.filter(s => s.game_id === gameId).slice(0, 1)[0];
+                    // 1. Global Champ from Database
+                    const top = highScores.filter(s => s.game_id === gameId).sort((a,b) => b.score - a.score)[0];
                     
-                    // Personal Best from LocalStorage (Matches user's "like spaceship" request)
+                    // 2. Your Best from Database
+                    const dbBest = highScores.find(s => s.game_id === gameId && s.user_email === user?.email);
+                    
+                    // 3. Your Best from LocalStorage
                     const localBest = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
+                    
+                    // Take the highest of either (Matches phone/laptop sync)
+                    const displayBest = Math.max(localBest, dbBest?.score || 0);
                     
                     return (
                       <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5 hover:bg-black/30 transition-all group">
@@ -385,7 +400,7 @@ function App() {
                           <div>
                             <div className="text-white/90 font-bold capitalize text-sm">{gameId}</div>
                             <div className="text-white/40 text-[9px] uppercase font-bold tracking-wider">
-                              {localBest > 0 ? `Your Best: ${localBest}` : 'No local score'}
+                              {displayBest > 0 ? `Your Best: ${displayBest}` : 'No score yet'}
                             </div>
                           </div>
                         </div>
@@ -394,12 +409,15 @@ function App() {
                             <span className="text-[10px]">🏆</span> {top ? top.score : 0}
                           </div>
                           <div className="text-white/20 text-[8px] truncate max-w-[120px] font-mono italic">
-                            {top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'No champ yet'}
+                            {top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'Searching...'}
                           </div>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-4 p-2 bg-purple-900/20 rounded-lg border border-purple-500/20 text-[8px] text-purple-300 leading-tight">
+                  <p>💡 <b>Sync Tip:</b> To ensure scores save to the cloud, make sure you ran the SQL script in your Supabase dashboard.</p>
                 </div>
               </div>
               
