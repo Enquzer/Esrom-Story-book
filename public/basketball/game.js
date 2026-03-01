@@ -231,8 +231,8 @@ function create() {
             scene.ball.setVelocity(vx, vy);
             scene.trail.start();
             
-            // Bounce logic: After 2.5 seconds, check if score was made or lost life
-            scene.time.delayedCall(2500, () => {
+            // Bounce logic: After 3 seconds, check if score was made or lost life
+            scene.time.delayedCall(3000, () => {
                 if (!scene.scoredInThisShot) {
                     scene.lives--;
                     scene.updateLivesDisplay();
