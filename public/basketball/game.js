@@ -127,13 +127,30 @@ function create() {
 
     scene.matter.world.on('collisionstart', (event) => {
         event.pairs.forEach(pair => {
-            if (pair.bodyA.label === 'topSensor' || pair.bodyB.label === 'topSensor') scene.scoredTop = true;
-            if (scene.scoredTop && (pair.bodyA.label === 'bottomSensor' || pair.bodyB.label === 'bottomSensor')) {
+            const labels = [pair.bodyA.label, pair.bodyB.label];
+            
+            // Track bounces if ball is moving
+            if (scene.isMoving && labels.includes('ball')) {
+                if (labels.includes('wall') || labels.includes('floor') || labels.includes('backboard')) {
+                    scene.bounceCount++;
+                    // Optional: visual spark on bounce
+                    console.log("Bounce! Count: " + scene.bounceCount);
+                }
+            }
+
+            if (labels.includes('topSensor')) scene.scoredTop = true;
+            if (scene.scoredTop && labels.includes('bottomSensor')) {
                 if (!scene.scoredInThisShot) {
-                    scene.score++;
+                    const points = 1 + scene.bounceCount;
+                    scene.score += points;
                     scene.scoreText.setText('SCORE: ' + scene.score);
                     scene.scoredInThisShot = true;
-                    showFeedback(scene, 'SWISH!', hoopX, hoopY - 100);
+                    
+                    if (scene.bounceCount > 0) {
+                        showFeedback(scene, `TRICK SHOT!\n+${points}`, hoopX, hoopY - 100);
+                    } else {
+                        showFeedback(scene, 'SWISH! +1', hoopX, hoopY - 100);
+                    }
                 }
                 scene.scoredTop = false;
             }
@@ -171,6 +188,7 @@ function create() {
         scene.scoredTop = false;
         scene.scoredInThisShot = false;
         scene.isMoving = false;
+        scene.bounceCount = 0;
     };
     scene.spawnBall();
 

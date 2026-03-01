@@ -367,7 +367,7 @@ function App() {
           {activeGame === 'spaceship' && <SpaceshipGame onBack={() => setActiveGame('none')} language={language} />}
           {activeGame === 'basketball' && (
             <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-[400/600]">
+              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-400/600">
                 <div className="bg-slate-800 p-2 flex justify-between items-center px-4 shrink-0">
                   <span className="text-white font-bold text-xs">🏀 Basketball Physics</span>
                   <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-bold transition-all">Close</button>
@@ -380,7 +380,7 @@ function App() {
           )}
           {activeGame === 'protect' && (
             <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-[400/600]">
+              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-400/600">
                 <div className="bg-slate-800 p-2 flex justify-between items-center px-4 shrink-0">
                   <span className="text-white font-bold text-xs">🛡️ Protect Game</span>
                   <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-bold transition-all">Close</button>
