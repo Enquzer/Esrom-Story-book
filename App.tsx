@@ -70,6 +70,17 @@ async function compressImage(base64: string, maxWidth = 800): Promise<string> {
   });
 }
 
+
+// Masks an email for privacy: "serv5468@gmail.com" → "se***@***.com"
+function maskEmail(email: string): string {
+  if (!email) return '???';
+  const [user, domain] = email.split('@');
+  const maskedUser = user.slice(0, 2) + '***';
+  const domainParts = domain?.split('.');
+  const maskedDomain = '***.' + (domainParts?.[domainParts.length - 1] || 'com');
+  return `${maskedUser}@${maskedDomain}`;
+}
+
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'input' | 'storybook' | 'saved'>('input');
@@ -400,7 +411,7 @@ function App() {
                             <span className="text-[10px]">🏆</span> {top ? top.score : (highScores === null ? '...' : 0)}
                           </div>
                           <div className="text-white/20 text-[8px] truncate max-w-[120px] font-mono italic">
-                            {highScores === null ? 'Searching...' : (top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'No cloud record')}
+                            {highScores === null ? 'Searching...' : (top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : maskEmail(top.user_email)) : 'No cloud record')}
                           </div>
                         </div>
                       </div>

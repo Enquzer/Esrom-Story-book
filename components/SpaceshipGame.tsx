@@ -334,21 +334,26 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, onGameOver, langu
 
       // Draw Planets with perspective
       planets.forEach(p => {
-        const perspective = 400 / (400 + p.z);
+        const perspective = 400 / Math.max(1, 400 + p.z);
         const screenX = (p.x - canvas.width / 2) * perspective + canvas.width / 2;
         const screenY = (p.y - canvas.height / 2) * perspective + canvas.height / 2;
         const size = p.baseSize * perspective;
 
-        if (size > 0.1) {
+        if (size > 0.1 && Number.isFinite(size) && Number.isFinite(screenX) && Number.isFinite(screenY)) {
           ctx.save();
           ctx.translate(screenX, screenY);
           ctx.globalAlpha = Math.min(1, perspective * 2);
           
-          // Planet body
-          const grad = ctx.createRadialGradient(-size/3, -size/3, size/10, 0, 0, size);
-          grad.addColorStop(0, p.color1);
-          grad.addColorStop(1, p.color2);
-          ctx.fillStyle = grad;
+          // Planet body - guard all gradient params against non-finite values
+          try {
+            const innerR = Math.max(0.001, size / 10);
+            const grad = ctx.createRadialGradient(-size/3, -size/3, innerR, 0, 0, size);
+            grad.addColorStop(0, p.color1);
+            grad.addColorStop(1, p.color2);
+            ctx.fillStyle = grad;
+          } catch {
+            ctx.fillStyle = p.color1;
+          }
           ctx.beginPath();
           ctx.arc(0, 0, size, 0, Math.PI * 2);
           ctx.fill();
