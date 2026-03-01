@@ -240,6 +240,11 @@ function create() {
                         scene.gameOver = true;
                         showFeedback(scene, 'GAME OVER', width/2, height/2, 5000);
                         scene.add.text(width/2, height/2 + 80, 'Final Score: ' + scene.score, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+                        
+                        // Report score to parent
+                        if (window.parent) {
+                            window.parent.postMessage({ type: 'GAME_OVER', gameId: 'basketball', score: scene.score }, '*');
+                        }
                     }
                 }
                 

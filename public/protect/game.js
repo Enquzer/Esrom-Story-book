@@ -465,6 +465,11 @@ function triggerGameOver(scene) {
     scene.add.text(W / 2, H / 2 - 55, '⚠  CITY DESTROYED  ⚠', { font: 'bold 38px monospace', fill: '#ff2222' }).setOrigin(0.5).setDepth(21);
     scene.add.text(W / 2, H / 2 + 10,  'FINAL SCORE: ' + score,   { font: 'bold 28px monospace', fill: '#00ffff' }).setOrigin(0.5).setDepth(21);
     scene.add.text(W / 2, H / 2 + 65, 'Click to restart',          { font: '18px monospace',     fill: '#aaaaaa' }).setOrigin(0.5).setDepth(21);
+    
+    // Report score to parent
+    if (window.parent) {
+        window.parent.postMessage({ type: 'GAME_OVER', gameId: 'protect', score: score }, '*');
+    }
 }
 
 // ── Update ────────────────────────────────────────────────────

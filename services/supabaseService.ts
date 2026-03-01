@@ -166,3 +166,43 @@ export async function getUserStories() {
   if (error) throw error;
   return data;
 }
+
+// 5. High Scores
+export async function getHighScores() {
+  const { data, error } = await supabase
+    .from('high_scores')
+    .select('user_email, game_id, score')
+    .order('score', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateHighScore(gameId: string, score: number) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Fetch current high score
+  const { data: current } = await supabase
+    .from('high_scores')
+    .select('score')
+    .eq('user_id', user.id)
+    .eq('game_id', gameId)
+    .single();
+
+  if (!current || score > current.score) {
+    const { error } = await supabase
+      .from('high_scores')
+      .upsert({
+        user_id: user.id,
+        user_email: user.email,
+        game_id: gameId,
+        score: score,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,game_id' });
+    
+    if (error) console.error("Error updating high score:", error);
+    return true; // New high score
+  }
+  return false;
+}

@@ -3,10 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 
 interface SpaceshipGameProps {
   onBack: () => void;
+  onGameOver: (score: number) => void;
   language: 'en' | 'am';
 }
 
-const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
+const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, onGameOver, language }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -503,8 +504,11 @@ const SpaceshipGame: React.FC<SpaceshipGameProps> = ({ onBack, language }) => {
   }, [isMobile]);
 
   useEffect(() => {
-    if (gameOver && score > highScore) { setHighScore(score); localStorage.setItem('spaceship_highscore', score.toString()); }
-  }, [gameOver, score]);
+    if (gameOver) {
+        if (score > highScore) { setHighScore(score); localStorage.setItem('spaceship_highscore', score.toString()); }
+        onGameOver(score);
+    }
+  }, [gameOver, score, onGameOver]);
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">

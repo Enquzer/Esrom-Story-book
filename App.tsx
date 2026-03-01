@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Page, Character, Language, SavedStory, PageBlueprint } from './types';
 import { generateFullStory, cartoonizeImage, getCredits } from './services/geminiService';
 import { translations } from './translations';
-import { saveStoryToSupabase, getUserStories, getStoryById } from './services/supabaseService';
+import { saveStoryToSupabase, getUserStories, getStoryById, getHighScores, updateHighScore } from './services/supabaseService';
 import { supabase } from './services/supabaseClient';
 import { User } from '@supabase/supabase-js';
 import Auth from './components/Auth';
@@ -93,6 +93,31 @@ function App() {
   const [withImages, setWithImages] = useState(true);
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
   const [activeGame, setActiveGame] = useState<'none' | 'spaceship' | 'basketball' | 'protect'>('none');
+  const [highScores, setHighScores] = useState<any[]>([]);
+
+  const fetchHighScores = useCallback(async () => {
+    try {
+      const scores = await getHighScores();
+      setHighScores(scores);
+    } catch (e) { console.error("Failed to fetch high scores", e); }
+  }, []);
+
+  useEffect(() => {
+    fetchHighScores();
+  }, [fetchHighScores]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'GAME_OVER') {
+        const { gameId, score } = event.data;
+        updateHighScore(gameId, score).then((isNew) => {
+          if (isNew) fetchHighScores();
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [fetchHighScores]);
 
   const t = translations[language];
 
@@ -303,7 +328,7 @@ function App() {
         <header className="p-4 flex flex-col items-center gap-4">
           <img src="/logo.png" alt="Logo" className="w-full max-w-[300px] drop-shadow-2xl" />
           {isHomeScreen && (
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-6">
               <div className="flex flex-col items-center gap-1 mb-2">
                 <div className="text-white/60 text-[10px] uppercase font-bold tracking-widest">Active Explorer</div>
                 <div className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-2xl text-white text-xs font-medium backdrop-blur-sm">
@@ -314,6 +339,34 @@ function App() {
               {credits && <div className="bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-1.5 rounded-full text-black text-xs font-black shadow-lg shadow-orange-950/20 animate-pulse">
                 ✨ {credits.amount} Credits
               </div>}
+
+              {/* Leaderboard Section */}
+              {highScores.length > 0 && (
+                <div className="w-full max-w-md bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-5 mt-4">
+                  <h3 className="text-white/80 text-[10px] uppercase font-black tracking-widest mb-4 flex items-center gap-2">
+                    🏆 Game Rankings
+                  </h3>
+                  <div className="space-y-3">
+                    {['spaceship', 'basketball', 'protect'].map(gameId => {
+                      const top = highScores.filter(s => s.game_id === gameId).slice(0, 1)[0];
+                      return (
+                        <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">
+                              {gameId === 'spaceship' ? '🚀' : gameId === 'basketball' ? '🏀' : '🛡️'}
+                            </span>
+                            <span className="text-white/90 font-bold capitalize text-sm">{gameId}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-amber-400 font-black text-sm">{top ? top.score : 0}</div>
+                            <div className="text-white/40 text-[9px] truncate max-w-[100px]">{top ? top.user_email : 'No champ yet'}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
               <div className="flex gap-4 mt-2">
                 <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition-all text-sm">
@@ -328,7 +381,13 @@ function App() {
         </header>
 
         <main className="container mx-auto px-4 py-8">
-          {activeGame === 'spaceship' && <SpaceshipGame onBack={() => setActiveGame('none')} language={language} />}
+          {activeGame === 'spaceship' && (
+            <SpaceshipGame 
+              onBack={() => setActiveGame('none')} 
+              language={language} 
+              onGameOver={(s) => updateHighScore('spaceship', s).then(isNew => isNew && fetchHighScores())}
+            />
+          )}
           {activeGame === 'basketball' && (
             <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 p-4">
               <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden flex flex-col aspect-400/600">
