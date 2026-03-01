@@ -188,9 +188,10 @@ export async function updateHighScore(gameId: string, score: number) {
     .select('score')
     .eq('user_id', user.id)
     .eq('game_id', gameId)
-    .single();
+    .maybeSingle();
 
   if (!current || score > current.score) {
+    console.log(`Updating high score for ${gameId}: ${score}`);
     const { error } = await supabase
       .from('high_scores')
       .upsert({

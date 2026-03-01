@@ -108,8 +108,10 @@ function App() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'GAME_OVER') {
+      // Basic origin check or content check
+      if (typeof event.data === 'object' && event.data?.type === 'GAME_OVER') {
         const { gameId, score } = event.data;
+        console.log(`Received game over from ${gameId} with score ${score}`);
         updateHighScore(gameId, score).then((isNew) => {
           if (isNew) fetchHighScores();
         });
@@ -280,7 +282,7 @@ function App() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-slate-900 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]">
             <div className="text-6xl mb-4 animate-bounce">✨</div>
-            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Our Magic Engine is Napping!</h2>
+            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-linear-to-r from-purple-400 to-pink-400">Our Magic Engine is Napping!</h2>
             <p className="text-slate-400 mb-6 text-sm">Our story units are taking a quick break to restore their sparkle. Please visit your library or play one of our games in the meantime!</p>
             <div className="flex flex-col gap-3">
               <button 
@@ -336,37 +338,41 @@ function App() {
                 </div>
               </div>
 
-              {credits && <div className="bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-1.5 rounded-full text-black text-xs font-black shadow-lg shadow-orange-950/20 animate-pulse">
+              {credits && <div className="bg-linear-to-r from-amber-400 to-orange-500 px-5 py-1.5 rounded-full text-black text-xs font-black shadow-lg shadow-orange-950/20 animate-pulse">
                 ✨ {credits.amount} Credits
               </div>}
 
               {/* Leaderboard Section */}
-              {highScores.length > 0 && (
-                <div className="w-full max-w-md bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-5 mt-4">
-                  <h3 className="text-white/80 text-[10px] uppercase font-black tracking-widest mb-4 flex items-center gap-2">
-                    🏆 Game Rankings
-                  </h3>
-                  <div className="space-y-3">
-                    {['spaceship', 'basketball', 'protect'].map(gameId => {
-                      const top = highScores.filter(s => s.game_id === gameId).slice(0, 1)[0];
-                      return (
-                        <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5">
-                          <div className="flex items-center gap-3">
-                            <span className="text-xl">
-                              {gameId === 'spaceship' ? '🚀' : gameId === 'basketball' ? '🏀' : '🛡️'}
-                            </span>
-                            <span className="text-white/90 font-bold capitalize text-sm">{gameId}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-amber-400 font-black text-sm">{top ? top.score : 0}</div>
-                            <div className="text-white/40 text-[9px] truncate max-w-[100px]">{top ? top.user_email : 'No champ yet'}</div>
+              <div className="w-full max-w-md bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-5 mt-4">
+                <h3 className="text-white/80 text-[10px] uppercase font-black tracking-widest mb-4 flex items-center gap-2">
+                  🏆 Rankings & Your Bests
+                </h3>
+                <div className="space-y-3">
+                  {['spaceship', 'basketball', 'protect'].map(gameId => {
+                    const top = highScores.filter(s => s.game_id === gameId).slice(0, 1)[0];
+                    const mine = highScores.filter(s => s.game_id === gameId && s.user_email === user?.email).slice(0, 1)[0];
+                    return (
+                      <div key={gameId} className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5 hover:bg-black/30 transition-all">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">
+                            {gameId === 'spaceship' ? '🚀' : gameId === 'basketball' ? '🏀' : '🛡️'}
+                          </span>
+                          <div>
+                            <div className="text-white/90 font-bold capitalize text-sm">{gameId}</div>
+                            <div className="text-white/30 text-[9px] uppercase font-medium">
+                              {mine ? `Your Best: ${mine.score}` : 'No score yet'}
+                            </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="text-right">
+                          <div className="text-amber-400 font-black text-sm">🏆 {top ? top.score : 0}</div>
+                          <div className="text-white/40 text-[9px] truncate max-w-[100px]">{top ? top.user_email : 'No champ yet'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
               
               <div className="flex gap-4 mt-2">
                 <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition-all text-sm">
