@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { User } from '@supabase/supabase-js';
+import logo from '../logo.png';
 
 const SpaceBackground = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -369,7 +370,7 @@ export default function Auth() {
       <div className="bg-slate-900/30 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full z-10 border border-white/10">
         <div className="flex justify-center mb-6 drop-shadow-2xl">
           <img 
-            src="/logo.png" 
+            src={logo} 
             alt="StorySpark Logo" 
             className="w-full max-w-72 h-auto object-contain mx-auto"
             onError={(e) => {
