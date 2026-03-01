@@ -163,14 +163,22 @@
         height: 100px;
       }
 
-      /* === NEW BOOK LAYOUT STYLES === */
+      /* ============================================================
+         HIGH-FIDELITY 3D BOOK STYLES
+         Perspective is set on .book-container (the parent of .book)
+         so that ALL leaves share one vanishing point — the spine.
+         The translateX(50%) centers the book so the spine is in
+         the middle of the container while pages flip right→left.
+         ============================================================ */
+
       .book-container {
         width: 90vw;
         max-width: 1000px;
         height: 65vh;
         max-height: 600px;
         position: relative;
-        perspective: 2500px;
+        /* Spec §1: perspective: 2000px on the main container */
+        perspective: 2000px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -180,25 +188,51 @@
         width: 100%;
         height: 100%;
         position: relative;
+        /* Spec §1: transform-style: preserve-3d propagates to leaves */
         transform-style: preserve-3d;
+        /* Spec §3: offset so spine stays centered while pages fly left */
+        transform: translateX(0);
+        /* Subtle book shadow */
+        filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.35));
       }
 
+      /* ── Book Spine (Spline) ─────────────────────────────────── */
+      .book-spine {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        width: 30px;
+        height: 100%;
+        background: linear-gradient(to right, 
+          rgba(0,0,0,0.3) 0%, 
+          rgba(0,0,0,0.1) 15%, 
+          rgba(255,255,255,0.1) 50%, 
+          rgba(0,0,0,0.1) 85%, 
+          rgba(0,0,0,0.3) 100%
+        ), #e2e8f0;
+        transform: translateX(-50%) translateZ(-1px);
+        border-radius: 4px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        z-index: 5;
+      }
+
+      /* ── Leaf (the flipping unit) ─────────────────────────────── */
       .paper {
         position: absolute;
         width: 50%;
         height: 100%;
         top: 0;
         right: 0;
+        /* Spec §1: hinge is the left edge */
         transform-origin: left center;
+        /* Spec §1: preserve-3d so front/back faces render in 3D space */
         transform-style: preserve-3d;
-        border-radius: 0 8px 8px 0;
-        /* Transition removed to favor high-fidelity JS physics */
+        border-radius: 0 10px 10px 0;
+        /* NO CSS transition — everything driven by JS rAF physics */
+        will-change: transform, clip-path;
       }
 
-      .paper.flipped {
-        transform: rotateY(-180deg);
-      }
-
+      /* ── Page faces ───────────────────────────────────────────── */
       .page-content {
         position: absolute;
         width: 100%;
@@ -206,49 +240,78 @@
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
-        background-color: #f8fafc; /* slate-50 */
-        border: 1px solid #e2e8f0; /* slate-200 */
-        backface-visibility: hidden;
+        /* Warm paper colour */
+        background-color: #fdfcf8;
+        /* Subtle page lines */
+        background-image:
+          repeating-linear-gradient(
+            transparent,
+            transparent 31px,
+            #e8e0d0 31px,
+            #e8e0d0 32px
+          );
+        border: 1px solid #ddd4c0;
         overflow: hidden;
+        /* Spec §1: backface-visibility: hidden so faces don't bleed */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
       }
 
       .front {
-        border-radius: 0 8px 8px 0;
-        box-shadow: inset -3px 0px 10px -7px rgba(0, 0, 0, 0.3);
+        border-radius: 0 10px 10px 0;
+        box-shadow:
+          inset -6px 0 16px -8px rgba(0, 0, 0, 0.25),
+          2px 0 8px -4px rgba(0, 0, 0, 0.15);
       }
 
+      /* Spec §1: .back must be pre-rotated 180° so it faces the reader
+         when the leaf is fully flipped (-180°)                        */
       .back {
         transform: rotateY(180deg);
-        border-radius: 8px 0 0 8px;
-        box-shadow: inset 3px 0px 10px -7px rgba(0, 0, 0, 0.3);
+        border-radius: 10px 0 0 10px;
+        box-shadow:
+          inset 6px 0 16px -8px rgba(0, 0, 0, 0.25),
+          -2px 0 8px -4px rgba(0, 0, 0, 0.15);
       }
 
+      /* ── Left-hand static page (the "already read" stack) ──────── */
       .back-cover {
         position: absolute;
         width: 50%;
         height: 100%;
         top: 0;
         left: 0;
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px 0 0 8px;
+        background-color: #fdfcf8;
+        background-image:
+          repeating-linear-gradient(
+            transparent,
+            transparent 31px,
+            #e8e0d0 31px,
+            #e8e0d0 32px
+          );
+        border: 1px solid #ddd4c0;
+        border-radius: 10px 0 0 10px;
+        box-shadow: inset 6px 0 16px -8px rgba(0,0,0,0.2);
       }
 
+      /* ── Navigation buttons ───────────────────────────────────── */
       .nav-button {
-        background-color: #2563eb; /* blue-600 */
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
         color: white;
         font-weight: bold;
         padding: 0.75rem 2rem;
-        border-radius: 8px;
-        transition: all 0.3s;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        transition: all 0.25s ease;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+        letter-spacing: 0.02em;
       }
       .nav-button:hover {
-        background-color: #1d4ed8; /* blue-700 */
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
         transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
       }
       .nav-button:disabled {
-        background-color: #94a3b8; /* slate-400 */
+        background: linear-gradient(135deg, #94a3b8, #718096);
         cursor: not-allowed;
         transform: none;
         box-shadow: none;

@@ -156,6 +156,17 @@ function App() {
       setStoryId(Date.now().toString());
       setIsSaved(false);
       refreshCredits();
+
+      // IF FULL PICTURE BOOK IS SELECTED: 
+      // Start generating the first spread immediately (automatic, no waiting)
+      if (withImages) {
+        // We'll let the StorybookViewer handle the 'active spread' logic, 
+        // but we trigger the first few to show progress.
+        setTimeout(() => {
+          // Internal event or callback could go here, 
+          // but better to handle it inside StorybookViewer's useEffect for the current spread.
+        }, 500);
+      }
     } catch (e: any) {
       console.error("Critical story error:", e);
       if (e.message === 'QUOTA_EXHAUSTED' || e.message?.includes('429') || e.message?.includes('503')) {

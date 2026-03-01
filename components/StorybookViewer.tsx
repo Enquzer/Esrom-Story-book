@@ -43,6 +43,7 @@ interface PageContentProps {
   isLoadingAudio: boolean;
   onGenerateImage: () => void;
   isGeneratingImage: boolean;
+  onHome: () => void;
   t: any;
 }
 
@@ -84,11 +85,25 @@ const renderInteractiveText = (page: Page, highlightedWordIndex: number, languag
 
 const PageContent: React.FC<PageContentProps> = React.memo(({ 
   page, language, playbackState, onPlay, onPause, onResume, onStop, highlightedWordIndex, isLoadingAudio,
-  onGenerateImage, isGeneratingImage, t
+  onGenerateImage, isGeneratingImage, onHome, t
 }) => {
+  const words = page.pageText.split(/\s+/).filter(Boolean);
+  const animatableWord = page.animation?.keyword?.toLowerCase();
+  const animationType = page.animation?.type || 'bounce';
+
   return (
     <>
       <div className="w-full h-1/2 relative rounded-lg mb-4 overflow-hidden shadow bg-slate-200 group">
+        <button 
+          onClick={(e) => { e.stopPropagation(); onHome(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 z-40 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-lg hover:bg-white transition-all hover:scale-110 active:scale-95 no-print"
+          title={t.home}
+        >
+          <span className="text-xl">🏠</span>
+        </button>
+
         {page.imageUrl ? (
           <img src={page.imageUrl} alt="Story illustration" className="w-full h-full object-cover" />
         ) : (
@@ -103,6 +118,8 @@ const PageContent: React.FC<PageContentProps> = React.memo(({
                 <p className="text-xs text-slate-500 mb-3">{t.noIllustration}</p>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onGenerateImage(); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
                   className="bg-blue-600 text-white text-xs font-bold py-2 px-4 rounded-full hover:bg-blue-700 transition-all shadow-md"
                 >
                   ✨ {t.generateIllustration} (2 Credits)
@@ -115,28 +132,56 @@ const PageContent: React.FC<PageContentProps> = React.memo(({
       <div className={`grow overflow-y-auto pr-2 relative ${highlightedWordIndex > -1 ? 'is-reading' : ''}`}>
         <div className="flex flex-col gap-3">
            <div className="flex flex-wrap items-center gap-2 mb-1 no-print">
-             {isLoadingAudio ? (
-                <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                  <span className="animate-spin text-xs">🌀</span>
-                  <span className="text-xs font-bold">{t.loadingVoice}</span>
-                </div>
-             ) : playbackState === 'stopped' ? (
-                <button onClick={(e) => { e.stopPropagation(); onPlay(1); }} className="px-4 py-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-bold shadow-sm">
-                  {t.playPage}
-                </button>
-             ) : (
-               <>
-                 <button onClick={(e) => { e.stopPropagation(); playbackState === 'playing' ? onPause() : onResume(); }} className="px-4 py-1.5 rounded-full bg-yellow-400 text-slate-800 hover:bg-yellow-500 transition-colors text-sm font-bold shadow-sm">
-                    {playbackState === 'playing' ? t.pause : t.resume}
+              {playbackState === 'stopped' ? (
+                 <button 
+                  onClick={(e) => { e.stopPropagation(); onPlay(1); }} 
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  className="px-4 py-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-bold shadow-sm"
+                 >
+                   {t.playPage}
                  </button>
-                 <button onClick={(e) => { e.stopPropagation(); onStop(); }} className="px-4 py-1.5 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors text-sm font-bold">
-                   {t.stop}
-                 </button>
-               </>
-             )}
+              ) : (
+                <>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); playbackState === 'playing' ? onPause() : onResume(); }} 
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    className="px-4 py-1.5 rounded-full bg-yellow-400 text-slate-800 hover:bg-yellow-500 transition-colors text-sm font-bold shadow-sm"
+                  >
+                     {playbackState === 'playing' ? t.pause : t.resume}
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onStop(); }} 
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    className="px-4 py-1.5 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition-colors text-sm font-bold"
+                  >
+                    {t.stop}
+                  </button>
+                </>
+              )}
            </div>
            <div className="grow">
-            {renderInteractiveText(page, highlightedWordIndex, language, onPause)}
+            <p className={`text-slate-700 text-xl leading-relaxed ${language === 'am' ? 'font-amharic' : ''} select-none`}>
+              {words.map((word, index) => {
+                const cleanWord = word.replace(/[.,!?;:"'()]/g, '').toLowerCase();
+                const isCurrent = index === highlightedWordIndex;
+                const isAction = animatableWord && cleanWord === animatableWord;
+                
+                return (
+                  <span 
+                    key={index} 
+                    className={`transition-all duration-300 inline-block px-1 rounded-md
+                      ${isCurrent ? 'bg-yellow-200 text-blue-700 scale-110 font-black shadow-[0_2px_8px_rgba(0,0,0,0.1)] z-10' : ''} 
+                      ${isAction && isCurrent ? `animate-${animationType}` : ''}
+                    `}
+                  >
+                    {word}{' '}
+                  </span>
+                );
+              })}
+            </p>
            </div>
         </div>
       </div>
@@ -156,10 +201,12 @@ interface StorybookViewerProps {
   isSaved: boolean;
   storyTitle?: string;
   onCreditsUpdate: () => void;
+  withImages?: boolean;
 }
 
 const StorybookViewer: React.FC<StorybookViewerProps> = ({ 
-  pages, pageAudio, language, character, characterImage, onExit, onSaveStory, isViewingSaved, isSaved, storyTitle, onCreditsUpdate 
+  pages, pageAudio, language, character, characterImage, onExit, onSaveStory, isViewingSaved, isSaved, storyTitle, onCreditsUpdate,
+  withImages = false
 }) => {
   const [currentSpread, setCurrentSpread] = useState(0);
   const t = translations[language];
@@ -183,30 +230,11 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
   const hasQuotaFailedRef = useRef(false);
 
   useEffect(() => {
-    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    const decodeAllAudio = async () => {
-        if (!audioContextRef.current) return;
-        const decodedBuffers = await Promise.all(pageAudio.map(audioBase64 => {
-            if (!audioBase64 || !audioContextRef.current) return null;
-            try {
-                const bytes = decode(audioBase64.split(',')[1]);
-                return decodeAudioData(bytes, audioContextRef.current);
-            } catch (e) { return null; }
-        }));
-        setAudioBuffers(decodedBuffers);
-    };
-    decodeAllAudio();
-    return () => { hardStop(); audioContextRef.current?.close(); };
-  }, [pageAudio]);
+    return () => { hardStop(); window.speechSynthesis.cancel(); };
+  }, []);
 
   const hardStop = useCallback(() => {
-    if (sourceNodeRef.current) {
-        sourceNodeRef.current.onended = null;
-        try { sourceNodeRef.current.stop(); } catch(e) {}
-        sourceNodeRef.current = null;
-    }
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
+    window.speechSynthesis.cancel();
     setActivePageIndex(null);
     setPlaybackState('stopped');
     setHighlightedWordIndex(-1);
@@ -243,100 +271,107 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
     }
   };
 
-  const ensureAudioLoaded = useCallback(async (pageIndex: number): Promise<AudioBuffer | null> => {
-    if (hasQuotaFailedRef.current) return null; // Stop trying if we know quota is hit
-    // Check if already in buffer
-    if (audioBuffers[pageIndex]) return audioBuffers[pageIndex];
-    if (!localPages[pageIndex]) return null;
+  // --- AUTOMATED IMAGE GENERATION ---
+  useEffect(() => {
+    if (!withImages) return;
+    
+    const page1 = currentSpread * 2;
+    const page2 = page1 + 1;
 
-    try {
-      setLoadingAudioIndex(pageIndex);
-      const newAudioBase64 = await generateSpeech(localPages[pageIndex].pageText);
-      const bytes = decode(newAudioBase64);
-      if (audioContextRef.current) {
-        const buffer = await decodeAudioData(bytes, audioContextRef.current);
-        setAudioBuffers(prev => {
-          const n = [...prev];
-          n[pageIndex] = buffer;
-          return n;
-        });
-        return buffer;
+    [page1, page2].forEach(idx => {
+      if (idx < localPages.length && !localPages[idx].imageUrl && generatingImageIndex !== idx) {
+        handleGenerateImage(idx).catch(() => {});
       }
-    } catch (e: any) {
-      console.error("Preload error:", e);
-      if (e.message?.includes('429') || e.message === 'QUOTA_EXHAUSTED' || e.status === 429) {
-          hasQuotaFailedRef.current = true;
-          setShowQuotaWarning(true);
-          setIsAutoPlay(false); // Stop auto-play if we hit a quota limit
-          // We don't alert here to avoid spamming alerts during preload
-      }
-    } finally {
-      if (loadingAudioIndex === pageIndex) {
-        setLoadingAudioIndex(null);
-      }
-    }
-    return null;
-  }, [audioBuffers, localPages, loadingAudioIndex]);
+    });
+  }, [currentSpread, withImages, localPages, generatingImageIndex]);
 
   const playPageAudio = useCallback(async (pageIndex: number, speed: number = 1) => {
-    if (activePageIndex !== null) hardStop();
-    
-    // Ensure current page is loaded
-    let buffer = await ensureAudioLoaded(pageIndex);
-    
-    if (!buffer || !audioContextRef.current) {
-      setLoadingAudioIndex(null);
-      return;
-    }
+    hardStop();
+    if (!localPages[pageIndex]) return;
 
-    if (audioContextRef.current.state === 'suspended') await audioContextRef.current.resume();
-    
     setActivePageIndex(pageIndex);
-    setActiveSpeed(speed);
     setPlaybackState('playing');
-    const sourceNode = audioContextRef.current.createBufferSource();
-    sourceNode.buffer = buffer;
-    sourceNode.playbackRate.value = speed;
-    sourceNode.connect(audioContextRef.current.destination);
-    sourceNode.start();
-    sourceNodeRef.current = sourceNode;
-    startTimeRef.current = audioContextRef.current.currentTime;
-    const words = localPages[pageIndex].pageText.split(/\s+/).filter(Boolean);
-    const duration = buffer.duration;
-    
-    const animate = () => {
-        if (!audioContextRef.current || !sourceNodeRef.current) return;
-        const audioConsumed = (audioContextRef.current.currentTime - startTimeRef.current) * speed;
-        if (audioConsumed >= duration) { setHighlightedWordIndex(-1); return; }
-        setHighlightedWordIndex(Math.min(Math.floor((audioConsumed / duration) * words.length), words.length - 1));
-        animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    animationFrameRef.current = requestAnimationFrame(animate);
 
-    sourceNode.onended = () => {
-        hardStop();
-        if (isAutoPlay) {
-            const isLeftPage = pageIndex % 2 === 0;
-            const hasRightPageOnSpread = isLeftPage && localPages[pageIndex + 1];
-            const hasNextSpread = pageIndex < localPages.length - 1;
+    const utterance = new SpeechSynthesisUtterance(localPages[pageIndex].pageText);
+    utterance.lang = language === 'am' ? 'am-ET' : 'en-US';
+    utterance.rate = 0.95;
 
-            if (hasRightPageOnSpread) {
-                // 1. Just finished Left page, move to Right page on same spread
-                setTimeout(() => playPageAudio(pageIndex + 1, speed), 1200);
-            } else if (hasNextSpread) {
-                // 2. Just finished Right page, FLIP page first
-                handleNext(); 
-                // 3. Wait for flip animation (1.5s) then start loading/playing next page
-                setTimeout(() => {
-                    playPageAudio(pageIndex + 1, speed);
-                }, 1600);
-            }
+    utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+            const charIndex = event.charIndex;
+            const textToChar = localPages[pageIndex].pageText.substring(0, charIndex);
+            // Count words up to this point
+            const wordCount = textToChar.trim() === '' ? 0 : textToChar.trim().split(/\s+/).length;
+            setHighlightedWordIndex(wordCount);
         }
     };
-  }, [activePageIndex, localPages, hardStop, isAutoPlay, handleNext, ensureAudioLoaded]);
 
-  const pauseAudio = () => { audioContextRef.current?.suspend(); setPlaybackState('paused'); };
-  const resumeAudio = () => { audioContextRef.current?.resume(); setPlaybackState('playing'); };
+    utterance.onend = () => {
+        setHighlightedWordIndex(-1);
+        setPlaybackState('stopped');
+        
+        if (isAutoPlay) {
+            const hasNextPage = !!localPages[pageIndex + 1];
+            
+            if (hasNextPage) {
+                // THE GOLDEN RULE: 
+                // Index 0 (Cover) MUST flip to see Page 1.
+                // Even indices (2, 4...) are Right-hand pages that MUST flip to see the next spread.
+                const shouldFlip = (pageIndex === 0) || (pageIndex > 0 && pageIndex % 2 === 0);
+
+                if (shouldFlip) {
+                    console.log("Auto-Play: Flipped page to reveal next content");
+                    handleNext(); 
+                    // Give the 3D engine time to settle the 'Soft Curve' mesh
+                    setTimeout(() => {
+                        playPageAudio(pageIndex + 1, speed);
+                    }, 1900);
+                } else {
+                    // Page is already visible on the current spread
+                    setTimeout(() => playPageAudio(pageIndex + 1, speed), 900);
+                }
+            } else {
+                // END OF STORY: Stop narration and disable auto-play
+                setPlaybackState('stopped');
+                setActivePageIndex(null);
+                setIsAutoPlay(false); 
+            }
+        } else {
+            setActivePageIndex(null);
+        }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }, [localPages, language, isAutoPlay, handleNext, hardStop]);
+
+  // --- AUTO-PLAY TRIGGER ---
+  useEffect(() => {
+    // If auto-play is enabled but nothing is reading, find the right starting page
+    if (isAutoPlay && playbackState === 'stopped' && activePageIndex === null) {
+      // Mapping current spread to the left-most visible page:
+      // Spread 0: Page 0
+      // Spread 1: Page 1 (and 2), Spread 2: Page 3 (and 4)
+      const startIdx = currentSpread === 0 ? 0 : (currentSpread * 2 - 1);
+      
+      // GUARD: Don't restart if we already reached and finished the last page
+      if (startIdx >= localPages.length - 1 && playbackState === 'stopped') {
+          return;
+      }
+
+      if (localPages[startIdx]) {
+        console.log("Auto-Play: Automatically starting narration for page", startIdx);
+        playPageAudio(startIdx);
+      }
+    }
+  }, [isAutoPlay, playbackState, activePageIndex, currentSpread, localPages, playPageAudio]);
+
+  // Placeholder for future expansion
+  useEffect(() => {
+    // Keep auto-play and active state aligned if needed
+  }, [isAutoPlay, activePageIndex]);
+
+  const pauseAudio = () => { window.speechSynthesis.pause(); setPlaybackState('paused'); };
+  const resumeAudio = () => { window.speechSynthesis.resume(); setPlaybackState('playing'); };
 
   const papers = useMemo(() => {
     const p = [];
@@ -377,10 +412,14 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
 
       <div className="book-container mt-8">
         <div className="book">
+          <div className="book-spine" />
           <div className="paper back-cover" style={{ zIndex: 0 }}></div>
           {papers.map((paper, index) => {
             const isFlipped = currentSpread > index;
-            const zIndex = isFlipped ? (papers.length + index) : (papers.length - index);
+            // Photorealistic Stacking Logic:
+            // Flipped pages (left stack): Later pages (higher index) on top
+            // Unflipped pages (right stack): Earlier pages (lower index) on top
+            const zIndex = isFlipped ? (100 + index) : (papers.length - index);
             
             // Only allow flipping the current page or the one before it
             const canFlipNext = currentSpread === index;
@@ -405,6 +444,7 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
                             highlightedWordIndex={activePageIndex === paper.front.pageIndex ? highlightedWordIndex : -1}
                             onGenerateImage={() => handleGenerateImage(paper.front!.pageIndex)}
                             isGeneratingImage={generatingImageIndex === paper.front.pageIndex}
+                            onHome={onExit}
                             t={t}
                         />
                     )
@@ -420,6 +460,7 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
                             highlightedWordIndex={activePageIndex === paper.back.pageIndex ? highlightedWordIndex : -1}
                             onGenerateImage={() => handleGenerateImage(paper.back!.pageIndex)}
                             isGeneratingImage={generatingImageIndex === paper.back.pageIndex}
+                            onHome={onExit}
                             t={t}
                         />
                     )

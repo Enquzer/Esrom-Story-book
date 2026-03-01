@@ -4,11 +4,14 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 
 dotenv.config();
 
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
@@ -61,6 +64,125 @@ app.post("/api/credits/use", (req, res) => {
     return res.json({ success: true, remaining: credits[email].amount });
   }
   res.status(403).json({ error: "Not enough magic credits!" });
+});
+
+// --- Gemini AI Proxy Routes ---
+
+/** POST /api/generate-story  { character, language, storyPrompt } */
+app.post("/api/generate-story", async (req, res) => {
+  try {
+    const { character, language, storyPrompt } = req.body;
+    const langName = language === "am" ? "Amharic" : "English";
+    const systemInstruction = `You are a master storyteller for children. Write a story about ${character?.name} based on: ${storyPrompt}. Language: ${langName}. Return JSON.`;
+
+    const fullStorySchema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        pages: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              pageText: { type: Type.STRING },
+              imagePrompt: { type: Type.STRING },
+              animation: {
+                type: Type.OBJECT,
+                properties: {
+                  keyword: { type: Type.STRING },
+                  type: { type: Type.STRING, enum: ["glow", "bounce", "shake", "spin", "float"] },
+                },
+              },
+            },
+            required: ["pageText", "imagePrompt"],
+          },
+          minItems: 8,
+          maxItems: 10,
+        },
+      },
+      required: ["title", "pages"],
+    };
+
+    const response = await genAI.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
+      config: { systemInstruction, responseMimeType: "application/json", responseSchema: fullStorySchema },
+    }) as any;
+
+    res.json(JSON.parse(response.text.trim()));
+  } catch (error: any) {
+    console.error("Gemini generate-story error:", error);
+    const status = error.status === 429 || error.code === 429 ? 429 : 500;
+    res.status(status).json({ error: "Failed to generate story" });
+  }
+});
+
+/** POST /api/generate-speech  { text } */
+app.post("/api/generate-speech", async (req, res) => {
+  try {
+    const { text } = req.body;
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } },
+      },
+    }) as any;
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    res.json({ audioData });
+  } catch (error: any) {
+    console.error("Gemini generate-speech error:", error);
+    res.status(500).json({ error: "Failed to generate speech" });
+  }
+});
+
+/** POST /api/cartoonize-image  { image: base64DataUrl } */
+app.post("/api/cartoonize-image", async (req, res) => {
+  try {
+    const { image } = req.body;
+    const mimeType = image.substring(5, image.indexOf(";"));
+    const data = image.substring(image.indexOf(",") + 1);
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: { parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] },
+      config: { responseModalities: [Modality.IMAGE] },
+    }) as any;
+    const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
+    if (!part) return res.status(500).json({ error: "No image generated" });
+    res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
+  } catch (error: any) {
+    console.error("Gemini cartoonize error:", error);
+    res.status(500).json({ error: "Failed to cartoonize image" });
+  }
+});
+
+/** POST /api/generate-image  { prompt, characterImage?: base64DataUrl } */
+app.post("/api/generate-image", async (req, res) => {
+  try {
+    const { prompt, characterImage } = req.body;
+    const parts: any[] = [];
+    if (characterImage) {
+      const mimeType = characterImage.substring(5, characterImage.indexOf(";"));
+      const data = characterImage.substring(characterImage.indexOf(",") + 1);
+      parts.push({ inlineData: { mimeType, data } });
+      parts.push({ text: `Storybook illustration of the character in this scene: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
+    } else {
+      parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
+    }
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: { parts },
+      config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: "4:3" } },
+    }) as any;
+    const part = response.candidates[0].content.parts.find((p: any) => p.inlineData);
+    if (!part) return res.status(500).json({ error: "No image data" });
+    res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
+  } catch (error: any) {
+    console.error("Gemini generate-image error:", error);
+    const status = error.status === 429 || error.code === 429 ? 429 : 500;
+    res.status(status).json({ error: "Failed to generate image" });
+  }
 });
 
 // --- Vite Middleware ---
