@@ -260,31 +260,38 @@ function App() {
             <div className="flex flex-col gap-3">
               <button 
                 onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} 
-                className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold transition-all shadow-lg shadow-purple-900/40"
+                className="w-full py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-black text-lg transition-all shadow-[0_4px_20px_rgba(147,51,234,0.4)]"
               >
-                📚 Visit Library
+                📚 {t.library}
               </button>
-              <div className="grid grid-cols-1 gap-2">
+              
+              <div className="space-y-2 mt-2">
                 <button 
                   onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} 
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition-all border-b-4 border-indigo-800 flex items-center justify-center gap-2"
                 >
-                  🚀 Play Spaceship
+                  🚀 {t.playSpaceship}
                 </button>
                 <button 
                   onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('basketball'); }} 
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-400 rounded-xl font-bold transition-all border-b-4 border-orange-700 flex items-center justify-center gap-2"
                 >
-                  🏀 Basketball Physics
+                  🏀 {t.playBasketball}
                 </button>
                 <button 
                   onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('protect'); }} 
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold transition-all border-b-4 border-emerald-800 flex items-center justify-center gap-2"
                 >
-                  🛡️ Protect City
+                  🛡️ {t.playProtect}
                 </button>
               </div>
-              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); }} className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-medium">Close</button>
+              
+              <button 
+                onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); }} 
+                className="mt-2 w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
