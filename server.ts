@@ -72,7 +72,6 @@ app.get("/api/credits", (req, res) => {
     const email = (req.query.email as string) || "guest";
     const credits = getCredits();
     const userCredits = getOrInitUserCredits(credits, email);
-    // Auto-save if we initialized new credits
     saveCredits(credits);
     res.json(userCredits);
   } catch (e: any) {
@@ -104,15 +103,10 @@ app.post("/api/credits/use", (req, res) => {
 
 // --- Gemini AI Proxy Routes ---
 
-/** POST /api/generate-story  { character, language, storyPrompt } */
 app.post("/api/generate-story", async (req, res) => {
   try {
     const { character, language, storyPrompt, email = "guest" } = req.body;
-    
-    // Validate credits
-    if (!checkCredits(email, 1)) {
-      return res.status(403).json({ error: "Not enough magic credits!" });
-    }
+    if (!checkCredits(email, 1)) return res.status(403).json({ error: "Not enough magic credits!" });
 
     const langName = language === "am" ? "Amharic" : "English";
     const systemInstruction = `You are a master storyteller for children. Write a story about ${character?.name} based on: ${storyPrompt}. Language: ${langName}. Return JSON.`;
@@ -145,67 +139,52 @@ app.post("/api/generate-story", async (req, res) => {
       required: ["title", "pages"],
     };
 
-    console.log("Generating story with prompt:", storyPrompt);
-    const result = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", systemInstruction });
+    const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: `Write a story about ${character?.name} based on: ${storyPrompt}` }] }],
-      config: { 
-        systemInstruction,
-        responseMimeType: "application/json", 
-        responseSchema: fullStorySchema as any
-      },
+      generationConfig: { responseMimeType: "application/json", responseSchema: fullStorySchema as any },
     });
 
-    const text = result.text;
-    if (!text) throw new Error("No text returned from Gemini");
-    console.log("Gemini Response received");
-
-    // Deduct credit only on success
+    const text = result.response.text();
     deductCredits(email, 1);
-
     res.json(JSON.parse(text));
   } catch (error: any) {
-    console.error("Gemini generate-story DETAIL:", error);
-    const statusCode = error.status || error.code || 500;
-    const errorMessage = error.message || "AI engine error";
-    res.status(statusCode === 429 ? 429 : 500).json({ 
-      error: statusCode === 429 ? "Daily magic quota exceeded! Please try again in a few minutes or tomorrow." : "Failed to generate story: " + errorMessage 
-    });
+    console.error("Gemini generate-story error:", error);
+    const code = error.status || error.code || 500;
+    res.status(code === 429 ? 429 : 500).json({ error: error.message });
   }
 });
 
-/** POST /api/generate-speech  { text } */
 app.post("/api/generate-speech", async (req, res) => {
   try {
     const { text } = req.body;
-    const response = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO] as any,
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } as any,
+      generationConfig: { 
+        responseModalities: ["AUDIO"] as any,
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } as any
       },
     });
-    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    const audioData = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
     res.json({ audioData });
   } catch (error: any) {
-    console.error("Gemini generate-speech error:", error);
+    console.error("Gemini speech error:", error);
     res.status(500).json({ error: "Failed to generate speech" });
   }
 });
 
-/** POST /api/cartoonize-image  { image: base64DataUrl } */
 app.post("/api/cartoonize-image", async (req, res) => {
   try {
     const { image } = req.body;
     const mimeType = image.substring(5, image.indexOf(";"));
     const data = image.substring(image.indexOf(",") + 1);
-    const response = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: "Cartoonize this character for a storybook. Style: 3D Pixar movie." }] }],
-      config: { responseModalities: [Modality.IMAGE] as any },
+      generationConfig: { responseModalities: ["IMAGE"] as any },
     });
-    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part) return res.status(500).json({ error: "No image generated" });
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
@@ -214,15 +193,10 @@ app.post("/api/cartoonize-image", async (req, res) => {
   }
 });
 
-/** POST /api/generate-image  { prompt, characterImage?: base64DataUrl } */
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt, characterImage, email = "guest" } = req.body;
-    
-    // Validate credits
-    if (!checkCredits(email, 0.5)) {
-      return res.status(403).json({ error: "Not enough magic credits!" });
-    }
+    if (!checkCredits(email, 0.5)) return res.status(403).json({ error: "Not enough magic credits!" });
 
     const parts: any[] = [];
     if (characterImage) {
@@ -234,23 +208,19 @@ app.post("/api/generate-image", async (req, res) => {
       parts.push({ text: `Storybook illustration: ${prompt}. Style: 3D Pixar movie, vibrant, magical.` });
     }
 
-    const response = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const result = await model.generateContent({
       contents: [{ role: "user", parts }],
-      config: { responseModalities: [Modality.IMAGE] as any },
+      generationConfig: { responseModalities: ["IMAGE"] as any },
     });
 
-    const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-    if (!part) return res.status(500).json({ error: "No image data" });
-
-    // Deduct credit
+    const part = result.response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    if (!part) return res.status(500).json({ error: "No image generated" });
     deductCredits(email, 0.5);
-
     res.json({ image: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` });
   } catch (error: any) {
-    console.error("Gemini generate-image error:", error);
-    const status = error.status === 429 || error.code === 429 ? 429 : 500;
-    res.status(status).json({ error: "Failed to generate image" });
+    console.error("Gemini image error:", error);
+    res.status(500).json({ error: "Failed to generate image" });
   }
 });
 
@@ -259,53 +229,26 @@ async function startServer() {
   let vite: any;
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
-    vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "custom", // Changed to custom to handle HTML manually for better reliability
-    });
+    vite = await createViteServer({ server: { middlewareMode: true }, appType: "custom" });
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
   }
 
-  // Explicitly serve index.html for all non-API GET routes
   app.use(async (req, res, next) => {
-    // Only handle GET requests that don't start with /api
-    if (req.method !== "GET" || req.originalUrl.startsWith("/api")) {
-      return next();
-    }
-
-    const url = req.originalUrl;
+    if (req.method !== "GET" || req.originalUrl.startsWith("/api")) return next();
     try {
-      let template: string;
-      if (process.env.NODE_ENV !== "production") {
-        // Read index.html from root for development
-        template = fs.readFileSync(path.resolve("./index.html"), "utf-8");
-        // Transform the HTML through Vite (handles @vite/client and other injections)
-        template = await vite.transformIndexHtml(url, template);
-      } else {
-        // In production, serve the built index.html from dist
-        template = fs.readFileSync(path.resolve("./dist/index.html"), "utf-8");
-      }
+      let template = fs.readFileSync(path.resolve(process.env.NODE_ENV !== "production" ? "./index.html" : "./dist/index.html"), "utf-8");
+      if (vite) template = await vite.transformIndexHtml(req.originalUrl, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(template);
     } catch (e: any) {
-      if (process.env.NODE_ENV !== "production") {
-        vite.ssrFixStacktrace(e);
-      }
-      console.error("Error serving index.html:", e);
+      if (vite) vite.ssrFixStacktrace(e);
       res.status(500).end(e.stack);
     }
   });
 
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
+  if (!process.env.VERCEL) app.listen(PORT, "0.0.0.0", () => console.log(`Server running on http://localhost:${PORT}`));
 }
 
-if (!process.env.VERCEL) {
-  startServer();
-}
-
+if (!process.env.VERCEL) startServer();
 export default app;

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Page, Character, Language, SavedStory, PageBlueprint, SavedStoryPage } from './types';
+import { Page, Character, Language, SavedStory, PageBlueprint } from './types';
 import { generateFullStory, cartoonizeImage, getCredits } from './services/geminiService';
 import { translations } from './translations';
 import { saveStoryToSupabase, getUserStories, getStoryById } from './services/supabaseService';
@@ -13,8 +13,6 @@ import Loader from './components/Loader';
 import SavedStories from './components/SavedStories';
 
 const STORAGE_KEY = 'ai_storybook_saved_stories';
-const QUOTA_LOCKOUT_KEY = 'gemini_quota_lockout_timestamp';
-const LOCKOUT_DURATION = 1000 * 60 * 60 * 12;
 
 function getSavedStories(): SavedStory[] {
   try {
@@ -81,7 +79,6 @@ function App() {
   const [language, setLanguage] = useState<Language>('en');
   const [storyPrompt, setStoryPrompt] = useState('');
   const [storyTitle, setStoryTitle] = useState('');
-  const [storyBlueprints, setStoryBlueprints] = useState<PageBlueprint[]>([]);
   const [storyPages, setStoryPages] = useState<Page[]>([]);
   const [storyAudio, setStoryAudio] = useState<(string | null)[]>([]);
   const [isSaved, setIsSaved] = useState(false);
@@ -97,6 +94,8 @@ function App() {
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
   const [activeGame, setActiveGame] = useState<'none' | 'spaceship' | 'basketball' | 'protect'>('none');
 
+  const t = translations[language];
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -109,28 +108,29 @@ function App() {
 
   const refreshCredits = useCallback(async () => {
     try {
-      const data = await getCredits();
+      const email = user?.email || 'guest';
+      const data = await getCredits(email);
       setCredits(data);
       if (data.amount <= 0) setIsQuotaExhausted(true);
       else setIsQuotaExhausted(false);
     } catch (e) { console.error("Failed to fetch credits", e); }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    refreshCredits();
-  }, [refreshCredits]);
+    if (user) refreshCredits();
+  }, [user, refreshCredits]);
 
   const handleStartStory = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setView('storybook');
     setLoadingMessage(t.summoningAdventure);
     
     try {
-      const fullStory = await generateFullStory(character, language, storyPrompt);
+      const email = user?.email || 'guest';
+      const fullStory = await generateFullStory(character, language, storyPrompt, email);
+      
       setStoryTitle(fullStory.title);
-      setStoryBlueprints(fullStory.pages);
-
+      
       let cartoonImg: string | null = null;
       if (withImages && characterImage) {
         setLoadingMessage(t.transformingPhoto);
@@ -142,11 +142,9 @@ function App() {
         }
       }
 
-      // In On-Demand mode, we don't generate images/audio here.
-      // We just set the pages with the text and prompts.
-      const finalPages: Page[] = fullStory.pages.map((blueprint, i) => ({
+      const finalPages: Page[] = fullStory.pages.map((blueprint: any) => ({
         pageText: blueprint.pageText,
-        imageUrl: '', // Will be generated on demand
+        imageUrl: '',
         imagePrompt: blueprint.imagePrompt,
         animation: blueprint.animation,
       }));
@@ -155,31 +153,20 @@ function App() {
       setStoryAudio(new Array(finalPages.length).fill(null));
       setStoryId(Date.now().toString());
       setIsSaved(false);
+      setView('storybook');
       refreshCredits();
 
-      // IF FULL PICTURE BOOK IS SELECTED: 
-      // Start generating the first spread immediately (automatic, no waiting)
-      if (withImages) {
-        // We'll let the StorybookViewer handle the 'active spread' logic, 
-        // but we trigger the first few to show progress.
-        setTimeout(() => {
-          // Internal event or callback could go here, 
-          // but better to handle it inside StorybookViewer's useEffect for the current spread.
-        }, 500);
-      }
-    } catch (e: any) {
-      console.error("Critical story error:", e);
-      if (e.message === 'QUOTA_EXHAUSTED' || e.message?.includes('429') || e.message?.includes('503')) {
+    } catch (err: any) {
+      console.error("Story generation failed:", err);
+      if (err.message?.includes('429') || err.message?.includes('quota')) {
         setIsGeminiQuotaExhausted(true);
-        setError("You've reached your daily magic limit for today! Please try again tomorrow, or wait a few moments if it's just a busy spike.");
       } else {
-        setError(e.message || t.magicSlow);
+        alert("Failed to generate story: " + err.message);
       }
-      setView('input');
     } finally {
       setIsLoading(false);
     }
-  }, [character, language, storyPrompt, characterImage, withImages, refreshCredits]);
+  }, [character, language, storyPrompt, characterImage, withImages, refreshCredits, user, t]);
 
   const handleExitToMenu = () => {
     setView('input');
@@ -194,11 +181,9 @@ function App() {
     setStoryTitle(story.title);
     setLanguage(story.language || 'en');
     setCharacter(story.character || { name: '', appearance: '', trait: '' });
-    setView('storybook');
     setLoadingMessage(t.restoringJourney);
 
     try {
-      // Try to load from Supabase if it's a Supabase story
       let pages = story.pages.map(p => ({ 
         pageText: p.pageText, 
         imageUrl: p.imageUrl || "https://placehold.co/600x400?text=Image+Not+Found", 
@@ -206,10 +191,7 @@ function App() {
       }));
       let audio = story.pages.map(p => p.audioData || null);
 
-      if (story.id && !story.id.includes('-')) {
-        // Local story
-      } else if (story.id) {
-        // Supabase story
+      if (story.id && story.id.includes('-')) {
         const dbStory = await getStoryById(story.id);
         if (dbStory && dbStory.pages) {
           pages = dbStory.pages.map((p: any) => ({
@@ -226,15 +208,15 @@ function App() {
       setIsViewingSaved(true);
       setIsSaved(true);
       setStoryId(story.id);
+      setView('storybook');
     } catch (e) { 
-      setError(t.failedLoadAdventure); 
-      setView('input'); 
+      alert(t.failedLoadAdventure); 
     } finally { 
       setIsLoading(false); 
     }
   };
 
-  const loadSavedStories = async () => {
+  const loadSavedStories = useCallback(async () => {
     try {
       const localStories = getSavedStories();
       if (user) {
@@ -246,219 +228,111 @@ function App() {
           character: { name: '', appearance: '', trait: '' },
           characterImage: s.cover_url || null,
           language: 'en',
-          pages: [] // Pages are loaded on demand
+          pages: [] 
         }));
         setSavedStories([...formattedDbStories, ...localStories]);
       } else {
         setSavedStories(localStories);
       }
     } catch (e) {
-      console.error("Failed to load stories", e);
       setSavedStories(getSavedStories());
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadSavedStories();
-  }, [user]);
+  }, [loadSavedStories]);
 
   const isHomeScreen = view === 'input' || view === 'saved';
-  const t = translations[language];
 
-  if (!user) {
-    return <Auth />;
-  }
+  if (!user) return <Auth />;
 
   return (
     <>
-      <div id="space-container" aria-hidden="true">
+      <div id="space-container" aria-hidden="true" className="fixed inset-0 pointer-events-none">
         <div id="stars1" className="stars" />
         <div id="stars2" className="stars" />
         <div id="stars3" className="stars" />
       </div>
-      {isHomeScreen && <Spaceship />}
-      <div className={`relative z-10 min-h-screen p-4 transition-colors duration-500 ${isHomeScreen ? 'bg-transparent' : 'bg-slate-100'}`}>
-        <header className="text-center mb-8 flex flex-col items-center no-print">
-          <div className="w-full max-w-2xl mb-6 drop-shadow-2xl">
-            <img 
-              src="/logo.png" 
-              alt="StorySpark Logo" 
-              className="w-full h-auto max-h-[300px] object-contain mx-auto drop-shadow-2xl"
-            />
-            
-            {/* Background elements for the welcome screen */}
-            {isHomeScreen && (
-              <div className="absolute inset-0 -z-10 pointer-events-none opacity-40">
-                <div id="planet1" className="absolute top-10 right-10 w-24 h-24 bg-linear-to-br from-orange-400 to-red-600 rounded-full blur-[1px] shadow-lg animate-pulse" />
-                <div id="planet2" className="absolute bottom-20 left-20 w-16 h-16 bg-linear-to-br from-blue-400 to-indigo-600 rounded-full blur-[1px]" />
-                <div id="planet3" className="absolute top-1/2 left-10 w-32 h-32 bg-linear-to-br from-green-300 to-teal-500 rounded-full blur-[1px] opacity-20" />
-              </div>
-            )}
+
+      {(isQuotaExhausted || isGeminiQuotaExhausted) && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-slate-900 border-2 border-purple-500/50 rounded-3xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]">
+            <div className="text-6xl mb-4 animate-bounce">✨</div>
+            <h2 className="text-2xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Engine's Napping!</h2>
+            <p className="text-slate-400 mb-6 text-sm">Our story engine is taking a quick break to restore its magic. Try your library or play a game!</p>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setView('saved'); }} className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-bold transition-all">📚 Visit Library</button>
+              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); setActiveGame('spaceship'); }} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700">🚀 Play Spaceship</button>
+              <button onClick={() => { setIsQuotaExhausted(false); setIsGeminiQuotaExhausted(false); }} className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-medium">Close</button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {isHomeScreen && <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-50"><Spaceship /></div>}
+
+      <div className={`relative z-10 min-h-screen transition-colors duration-500 ${isHomeScreen ? 'bg-transparent' : 'bg-slate-50'}`}>
+        <header className="p-4 flex flex-col items-center gap-4">
+          <img src="/logo.png" alt="Logo" className="w-full max-w-[300px] drop-shadow-2xl" />
           {isHomeScreen && (
-            <div className="mt-4 flex flex-col items-center gap-4">
-              {credits && (
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1 rounded-full text-white text-sm font-bold">
-                  ✨ {credits.amount} {t.creditsLeft}
-                </div>
-              )}
-              <div className="flex justify-center gap-4">
-                <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30 transition-all">
-                  {view === 'input' ? `📚 ${t.library}` : `✍️ ${t.create}`}
+            <div className="flex flex-col items-center gap-3">
+              {credits && <div className="bg-white/10 backdrop-blur-md px-4 py-1 rounded-full text-white text-sm font-bold">✨ {credits.amount} Credits</div>}
+              <div className="flex gap-4">
+                <button onClick={() => setView(view === 'input' ? 'saved' : 'input')} className="bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-6 rounded-full hover:bg-white/30">
+                  {view === 'input' ? '📚 Library' : '✍️ Create'}
                 </button>
-                <button 
-                  onClick={() => supabase.auth.signOut()} 
-                  className="bg-red-500/20 backdrop-blur-md border border-red-500/30 text-white font-bold py-2 px-6 rounded-full hover:bg-red-500/40 transition-all"
-                >
-                  🚪 Logout
-                </button>
+                <button onClick={() => supabase.auth.signOut()} className="bg-red-500/20 backdrop-blur-md border border-red-500/30 text-white font-bold py-2 px-6 rounded-full hover:bg-red-500/40">🚪 Logout</button>
               </div>
             </div>
           )}
         </header>
 
-        <main className="container mx-auto max-w-6xl">
-          {/* Custom Quota Exhausted Popup */}
-          {error && (error.includes('magic limit') || error.includes('quota')) ? (
-            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                <div className="bg-white p-8 rounded-[40px] shadow-2xl max-w-md w-full text-center border-4 border-blue-100 animate-in zoom-in duration-300">
-                    <div className="text-6xl mb-4">🚀</div>
-                    <h2 className="text-2xl font-black text-slate-800 mb-2">{t.magicLimitReached}</h2>
-                    <p className="text-slate-600 mb-8">{error}</p>
-                    
-                    <div className="flex flex-col gap-3">
-                        <button 
-                            onClick={() => { setError(null); setView('saved'); }}
-                            className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg"
-                        >
-                            📚 {t.library}
-                        </button>
-                        <button 
-                            onClick={() => { setActiveGame('spaceship'); setError(null); }}
-                            className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg"
-                        >
-                            🚀 {t.playSpaceship}
-                        </button>
-                        <button 
-                            onClick={() => { setActiveGame('basketball'); setError(null); }}
-                            className="w-full bg-orange-600 text-white font-bold py-4 rounded-2xl hover:bg-orange-700 transition-all shadow-lg"
-                        >
-                            🏀 {t.playBasketball}
-                        </button>
-                        <button 
-                            onClick={() => { setActiveGame('protect'); setError(null); }}
-                            className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg"
-                        >
-                            🛡️ {t.playProtect}
-                        </button>
-                        <button 
-                            onClick={() => setError(null)}
-                            className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl hover:bg-slate-200 transition-all"
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-          ) : error ? (
-            <div className="bg-red-500 text-white p-4 rounded-xl mb-6 font-bold shadow-lg animate-bounce no-print">{error}</div>
-          ) : null}
-          
+        <main className="container mx-auto px-4 py-8">
           {activeGame === 'spaceship' && <SpaceshipGame onBack={() => setActiveGame('none')} language={language} />}
           {activeGame === 'basketball' && (
-            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-400/600">
-                <div className="bg-slate-800 p-2 flex justify-between items-center px-4 shrink-0">
-                  <span className="text-white font-bold text-xs">🏀 Basketball Physics</span>
-                  <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-bold transition-all">Close</button>
-                </div>
-                <div className="grow w-full h-full relative">
-                   <iframe src="/basketball/index.html" className="absolute inset-0 w-full h-full border-none" title="Basketball Game" />
-                </div>
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 p-4">
+              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden flex flex-col aspect-400/600">
+                <div className="bg-slate-800 p-2 flex justify-between items-center px-4"><span className="text-white font-bold text-xs">🏀 Basketball</span><button onClick={() => setActiveGame('none')} className="text-white font-black">X</button></div>
+                <iframe src="/basketball/index.html" className="grow w-full border-none" />
               </div>
             </div>
           )}
           {activeGame === 'protect' && (
-            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden border-4 border-slate-700 shadow-2xl flex flex-col aspect-400/600">
-                <div className="bg-slate-800 p-2 flex justify-between items-center px-4 shrink-0">
-                  <span className="text-white font-bold text-xs">🛡️ Protect Game</span>
-                  <button onClick={() => setActiveGame('none')} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-bold transition-all">Close</button>
-                </div>
-                <div className="grow w-full h-full relative">
-                   <iframe src="/protect/index.html" className="absolute inset-0 w-full h-full border-none" title="Protect Game" />
-                </div>
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 p-4">
+              <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl overflow-hidden flex flex-col aspect-400/600">
+                <div className="bg-slate-800 p-2 flex justify-between items-center px-4"><span className="text-white font-bold text-xs">🛡️ Protect</span><button onClick={() => setActiveGame('none')} className="text-white font-black">X</button></div>
+                <iframe src="/protect/index.html" className="grow w-full border-none" />
               </div>
             </div>
           )}
-          <div className="flex justify-center">
-            {view === 'input' && (
-              <StoryInput 
-                character={character} setCharacter={setCharacter} 
-                characterImage={characterImage} setCharacterImage={setCharacterImage} 
-                language={language} setLanguage={setLanguage} 
-                storyPrompt={storyPrompt} setStoryPrompt={setStoryPrompt} 
-                onSubmit={handleStartStory} isLoading={isLoading} 
-                savedStories={savedStories} onLoadSavedStory={handleLoadStory} 
-                isQuotaExhausted={isQuotaExhausted || isGeminiQuotaExhausted}
-                withImages={withImages} setWithImages={setWithImages}
-                onPlaySpaceship={() => setActiveGame('spaceship')}
-                onPlayBasketball={() => setActiveGame('basketball')}
-                onPlayProtect={() => setActiveGame('protect')}
-              />
-            )}
-            {view === 'saved' && (
-              <SavedStories 
-                stories={savedStories} 
-                onLoad={handleLoadStory} 
-                onDelete={(id) => { deleteStoryFromStorage(id); setSavedStories(getSavedStories()); }} 
-                language={language}
-                onHome={() => setView('input')}
-              />
-            )}
-            {view === 'storybook' && isLoading && <Loader message={loadingMessage} language={language} />}
-            {view === 'storybook' && !isLoading && storyPages.length > 0 && storyId && (
-              <StorybookViewer 
-                key={storyId} pages={storyPages} pageAudio={storyAudio} 
-                onExit={handleExitToMenu} 
-                character={character}
-                characterImage={cartoonizedCharacterImage}
-                onSaveStory={async () => { 
-                  try {
-                    setLoadingMessage("Saving to cloud...");
-                    setIsLoading(true);
-                    if (user) {
-                      await saveStoryToSupabase(storyTitle, character.trait || 'Adventure', storyPages, cartoonizedCharacterImage || undefined);
-                      alert("Story saved to cloud successfully!");
-                    } else {
-                      // Fallback to local storage
-                      const compressedPages = await Promise.all(storyPages.map(async (p, i) => ({
-                        ...p,
-                        imageUrl: p.imageUrl ? await compressImage(p.imageUrl) : '',
-                        audioData: storyAudio[i]
-                      })));
-                      saveStoryToStorage({ 
-                        title: storyTitle, character, characterImage, 
-                        pages: compressedPages, 
-                        language 
-                      }); 
-                      alert("Story saved locally!");
-                    }
-                    setIsSaved(true); 
-                    loadSavedStories();
-                  } catch (e: any) {
-                    console.error("Save error:", e);
-                    alert("Failed to save story: " + e.message);
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }} 
-                language={language} isViewingSaved={isViewingSaved} 
-                isSaved={isSaved} storyTitle={storyTitle} 
-                onCreditsUpdate={refreshCredits}
-              />
-            )}
-          </div>
+
+          {view === 'input' && !isLoading && (
+            <StoryInput character={character} setCharacter={setCharacter} characterImage={characterImage} setCharacterImage={setCharacterImage} language={language} setLanguage={setLanguage} storyPrompt={storyPrompt} setStoryPrompt={setStoryPrompt} onSubmit={handleStartStory} isLoading={isLoading} savedStories={savedStories} onLoadSavedStory={handleLoadStory} isQuotaExhausted={isQuotaExhausted || isGeminiQuotaExhausted} withImages={withImages} setWithImages={setWithImages} onPlaySpaceship={() => setActiveGame('spaceship')} onPlayBasketball={() => setActiveGame('basketball')} onPlayProtect={() => setActiveGame('protect')} />
+          )}
+
+          {view === 'saved' && (
+            <SavedStories stories={savedStories} onLoad={handleLoadStory} onDelete={(id) => { deleteStoryFromStorage(id); loadSavedStories(); }} language={language} onHome={() => setView('input')} />
+          )}
+
+          {isLoading && <Loader message={loadingMessage} language={language} />}
+
+          {view === 'storybook' && !isLoading && storyPages.length > 0 && storyId && (
+            <StorybookViewer key={storyId} pages={storyPages} pageAudio={storyAudio} onExit={handleExitToMenu} character={character} characterImage={cartoonizedCharacterImage} onSaveStory={async () => {
+              try {
+                setIsLoading(true);
+                if (user) {
+                  await saveStoryToSupabase(storyTitle, character.trait || 'Adventure', storyPages, cartoonizedCharacterImage || undefined);
+                  alert("Saved to cloud!");
+                } else {
+                  const compressedPages = await Promise.all(storyPages.map(async (p, i) => ({ ...p, imageUrl: p.imageUrl ? await compressImage(p.imageUrl) : '', audioData: storyAudio[i] })));
+                  saveStoryToStorage({ title: storyTitle, character, characterImage, pages: compressedPages, language }); 
+                  alert("Saved locally!");
+                }
+                setIsSaved(true); loadSavedStories();
+              } catch (e: any) { alert("Error: " + e.message); } finally { setIsLoading(false); }
+            }} language={language} isViewingSaved={isViewingSaved} isSaved={isSaved} storyTitle={storyTitle} onCreditsUpdate={refreshCredits} />
+          )}
         </main>
       </div>
     </>
