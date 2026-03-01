@@ -279,11 +279,11 @@ function App() {
       {isHomeScreen && <Spaceship />}
       <div className={`relative z-10 min-h-screen p-4 transition-colors duration-500 ${isHomeScreen ? 'bg-transparent' : 'bg-slate-100'}`}>
         <header className="text-center mb-8 flex flex-col items-center no-print">
-          <div className="w-full max-w-lg mb-4 drop-shadow-2xl">
+          <div className="w-full max-w-2xl mb-6 drop-shadow-2xl">
             <img 
               src="/logo.png" 
               alt="StorySpark Logo" 
-              className="w-full h-auto max-h-32 object-contain mx-auto drop-shadow-2xl"
+              className="w-full h-auto max-h-48 object-contain mx-auto drop-shadow-2xl"
             />
             
             {/* Background elements for the welcome screen */}
