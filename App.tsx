@@ -93,22 +93,23 @@ function App() {
   const [withImages, setWithImages] = useState(true);
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
   const [activeGame, setActiveGame] = useState<'none' | 'spaceship' | 'basketball' | 'protect'>('none');
-  const [highScores, setHighScores] = useState<any[]>([]);
+  const [highScores, setHighScores] = useState<any[] | null>(null);
 
   const fetchHighScores = useCallback(async () => {
     try {
+      console.log("Checking for high scores in Supabase...");
       const scores = await getHighScores();
-      console.log("High scores fetched:", scores.length);
       setHighScores(scores || []);
       
       // Auto-Sync Database scores to LocalStorage for current user
-      if (user && scores) {
+      if (user && scores && scores.length > 0) {
+        console.log(`Syncing ${scores.length} scores from cloud...`);
         ['spaceship', 'basketball', 'protect'].forEach(gameId => {
           const myBest = scores.find(s => s.game_id === gameId && s.user_email === user.email);
           if (myBest) {
             const local = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
             if (myBest.score > local) {
-              console.log(`Syncing ${gameId} high score: ${myBest.score}`);
+              console.log(`Cloud score (${myBest.score}) is higher than Local (${local}) for ${gameId}. Syncing...`);
               localStorage.setItem(`${gameId}_highscore`, myBest.score.toString());
             }
           }
@@ -116,10 +117,7 @@ function App() {
       }
     } catch (e: any) { 
       console.error("Failed to fetch high scores from Supabase:", e.message); 
-      // This is a sign the high_scores table might not exist yet
-      if (e.message?.includes('does not exist')) {
-        console.warn("TIP: Please run the high_scores table SQL in your Supabase dashboard!");
-      }
+      setHighScores([]); // Fallback to empty if table doesn't exist
     }
   }, [user]);
 
@@ -379,16 +377,9 @@ function App() {
                 
                 <div className="space-y-3">
                   {['spaceship', 'basketball', 'protect'].map(gameId => {
-                    // 1. Global Champ from Database
-                    const top = highScores.filter(s => s.game_id === gameId).sort((a,b) => b.score - a.score)[0];
-                    
-                    // 2. Your Best from Database
-                    const dbBest = highScores.find(s => s.game_id === gameId && s.user_email === user?.email);
-                    
-                    // 3. Your Best from LocalStorage
+                    const top = highScores ? highScores.filter(s => s.game_id === gameId).sort((a,b) => b.score - a.score)[0] : null;
+                    const dbBest = highScores ? highScores.find(s => s.game_id === gameId && s.user_email === user?.email) : null;
                     const localBest = parseInt(localStorage.getItem(`${gameId}_highscore`) || '0');
-                    
-                    // Take the highest of either (Matches phone/laptop sync)
                     const displayBest = Math.max(localBest, dbBest?.score || 0);
                     
                     return (
@@ -406,10 +397,10 @@ function App() {
                         </div>
                         <div className="text-right">
                           <div className="text-amber-400 font-black text-sm flex items-center justify-end gap-1">
-                            <span className="text-[10px]">🏆</span> {top ? top.score : 0}
+                            <span className="text-[10px]">🏆</span> {top ? top.score : (highScores === null ? '...' : 0)}
                           </div>
                           <div className="text-white/20 text-[8px] truncate max-w-[120px] font-mono italic">
-                            {top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'Searching...'}
+                            {highScores === null ? 'Searching...' : (top ? (top.user_email === user?.email ? '✨ You are Champ! ✨' : top.user_email) : 'No cloud record')}
                           </div>
                         </div>
                       </div>

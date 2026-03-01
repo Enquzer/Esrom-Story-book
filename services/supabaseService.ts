@@ -183,16 +183,21 @@ export async function updateHighScore(gameId: string, score: number) {
   if (!user) return;
 
   // Fetch current high score
-  const { data: current } = await supabase
+  const { data: current, error: fetchError } = await supabase
     .from('high_scores')
     .select('score')
     .eq('user_id', user.id)
     .eq('game_id', gameId)
     .maybeSingle();
 
+  if (fetchError) {
+    console.error("Error checking high score:", fetchError.message);
+    return false;
+  }
+
   if (!current || score > current.score) {
-    console.log(`Updating high score for ${gameId}: ${score}`);
-    const { error } = await supabase
+    console.log(`Syncing ${gameId} score to cloud: ${score}`);
+    const { error: upsertError } = await supabase
       .from('high_scores')
       .upsert({
         user_id: user.id,
@@ -202,7 +207,10 @@ export async function updateHighScore(gameId: string, score: number) {
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id,game_id' });
     
-    if (error) console.error("Error updating high score:", error);
+    if (upsertError) {
+      console.error("Error saving high score to Supabase:", upsertError.message);
+      return false;
+    }
     return true; // New high score
   }
   return false;
