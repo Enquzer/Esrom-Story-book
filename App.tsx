@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import logo from './logo.png';
 import { Page, Character, Language, SavedStory, PageBlueprint, SavedStoryPage } from './types';
 import { generateFullStory, cartoonizeImage, getCredits } from './services/geminiService';
 import { translations } from './translations';
@@ -282,7 +281,7 @@ function App() {
         <header className="text-center mb-8 flex flex-col items-center no-print">
           <div className="w-full max-w-lg mb-4 drop-shadow-2xl">
             <img 
-              src={logo} 
+              src="/logo.png" 
               alt="StorySpark Logo" 
               className="w-full h-auto max-h-32 object-contain mx-auto"
             />
