@@ -116,34 +116,39 @@ const StoryInput: React.FC<StoryInputProps> = ({
 
       <h2 className="text-3xl sm:text-4xl font-extrabold text-center text-slate-800 tracking-tight mt-4">{t.createAdventure}</h2>
       
-      {/* Photo Engine Nap Notice */}
-      <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6 flex flex-col items-center text-center space-y-3 shadow-inner">
-        <div className="text-4xl">😴</div>
-        <p className="font-extrabold text-blue-900 text-lg leading-tight">
-          Our photo processing engine needs a nap!
+      {/* Feature Showcase Banner */}
+      <div className="bg-linear-to-br from-violet-50 to-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 flex flex-col items-center text-center space-y-3 shadow-inner">
+        <div className="flex items-center gap-2">
+          <span className="text-3xl">✨</span>
+          <p className="font-extrabold text-indigo-900 text-base leading-tight">
+            Full Picture Book Mode — Powered by Imagen 3!
+          </p>
+        </div>
+        <p className="text-indigo-600 text-xs font-medium">
+          Toggle "Full Picture Book" below to generate AI illustrations for every page of your story.
         </p>
-        <p className="text-blue-700 text-sm font-medium">
-          Generating text-only stories is recommended today.
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <button 
-            onClick={onPlaySpaceship}
-            className="bg-indigo-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
-          >
-            <span>🚀</span> {t.playSpaceship}
-          </button>
-          <button 
-            onClick={onPlayBasketball}
-            className="bg-orange-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-orange-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
-          >
-            <span>🏀</span> {t.playBasketball}
-          </button>
-          <button 
-            onClick={onPlayProtect}
-            className="bg-emerald-600 text-white font-bold py-2.5 px-6 rounded-full hover:bg-emerald-700 transition-all shadow-md active:scale-95 flex items-center gap-2"
-          >
-            <span>🛡️</span> {t.playProtect}
-          </button>
+        <div className="flex flex-wrap justify-center gap-2 pt-1">
+          <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Or play a game while you wait:</span>
+          <div className="flex flex-wrap justify-center gap-2 w-full">
+            <button 
+              onClick={onPlaySpaceship}
+              className="bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-full hover:bg-indigo-700 transition-all shadow-sm active:scale-95 text-xs flex items-center gap-1"
+            >
+              🚀 {t.playSpaceship}
+            </button>
+            <button 
+              onClick={onPlayBasketball}
+              className="bg-orange-500 text-white font-bold py-1.5 px-4 rounded-full hover:bg-orange-600 transition-all shadow-sm active:scale-95 text-xs flex items-center gap-1"
+            >
+              🏀 {t.playBasketball}
+            </button>
+            <button 
+              onClick={onPlayProtect}
+              className="bg-emerald-600 text-white font-bold py-1.5 px-4 rounded-full hover:bg-emerald-700 transition-all shadow-sm active:scale-95 text-xs flex items-center gap-1"
+            >
+              🛡️ {t.playProtect}
+            </button>
+          </div>
         </div>
       </div>
 

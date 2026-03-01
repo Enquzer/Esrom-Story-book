@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "functions": {
+    "server.ts": { "maxDuration": 60 }
+  },
   "builds": [
     {
       "src": "server.ts",

@@ -41,6 +41,37 @@ export async function generateFullStory(
   return handleResponse(response);
 }
 
+// Phase 1: Generate story text (6 pages) + first 3 images.
+// Opens the book fast; last 3 images are loaded by generatePhase2 in background.
+export async function generatePhase1(
+  character: Character,
+  language: Language,
+  storyPrompt: string,
+  characterImage: string | null,
+  email: string = 'guest'
+): Promise<{ title: string; pages: (PageBlueprint & { imageUrl: string })[]; phase2Prompts: string[] }> {
+  const response = await fetch(`${API_BASE}/generate-phase-1`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ character, language, storyPrompt, characterImage, email }),
+  });
+  return handleResponse(response);
+}
+
+// Phase 2: Fetch the remaining 3 images in the background.
+export async function generatePhase2(
+  prompts: string[],
+  characterImage: string | null,
+  email: string = 'guest'
+): Promise<{ images: string[] }> {
+  const response = await fetch(`${API_BASE}/generate-phase-2`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompts, characterImage, email }),
+  });
+  return handleResponse(response);
+}
+
 export async function generateSpeech(text: string): Promise<string> {
   const response = await fetch(`${API_BASE}/generate-speech`, {
     method: 'POST',

@@ -107,24 +107,21 @@ const PageContent: React.FC<PageContentProps> = React.memo(({
         {page.imageUrl ? (
           <img src={page.imageUrl} alt="Story illustration" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-linear-to-br from-violet-50 via-indigo-50 to-blue-50 animate-pulse">
             {isGeneratingImage ? (
               <div className="flex flex-col items-center gap-2">
                 <span className="animate-spin text-3xl">🎨</span>
                 <span className="text-sm font-bold text-slate-500">{t.paintingImagination}</span>
               </div>
             ) : (
-              <>
-                <p className="text-xs text-slate-500 mb-3">{t.noIllustration}</p>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onGenerateImage(); }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onPointerUp={(e) => e.stopPropagation()}
-                  className="bg-blue-600 text-white text-xs font-bold py-2 px-4 rounded-full hover:bg-blue-700 transition-all shadow-md"
-                >
-                  ✨ {t.generateIllustration} (2 Credits)
-                </button>
-              </>
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative">
+                  <span className="text-5xl">✨</span>
+                  <span className="absolute -top-1 -right-1 text-2xl animate-bounce">🖌️</span>
+                </div>
+                <p className="text-indigo-500 font-bold text-sm mt-1">The magic ink is drying...</p>
+                <p className="text-indigo-300 text-xs">Your illustration is being painted</p>
+              </div>
             )}
           </div>
         )}
@@ -202,11 +199,12 @@ interface StorybookViewerProps {
   storyTitle?: string;
   onCreditsUpdate: () => void;
   withImages?: boolean;
+  isPhase2Loading?: boolean;  // true while background images (pages 4-6) are loading
 }
 
 const StorybookViewer: React.FC<StorybookViewerProps> = ({ 
   pages, pageAudio, language, character, characterImage, onExit, onSaveStory, isViewingSaved, isSaved, storyTitle, onCreditsUpdate,
-  withImages = false
+  withImages = false, isPhase2Loading = false
 }) => {
   const [currentSpread, setCurrentSpread] = useState(0);
   const t = translations[language];
@@ -271,19 +269,11 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
     }
   };
 
-  // --- AUTOMATED IMAGE GENERATION ---
+  // --- PAGES UPDATE from parent (phase 2 patching) ---
+  // When the parent patches in phase-2 images, sync localPages
   useEffect(() => {
-    if (!withImages) return;
-    
-    const page1 = currentSpread * 2;
-    const page2 = page1 + 1;
-
-    [page1, page2].forEach(idx => {
-      if (idx < localPages.length && !localPages[idx].imageUrl && generatingImageIndex !== idx) {
-        handleGenerateImage(idx).catch(() => {});
-      }
-    });
-  }, [currentSpread, withImages, localPages, generatingImageIndex]);
+    setLocalPages(pages);
+  }, [pages]);
 
   const playPageAudio = useCallback(async (pageIndex: number, speed: number = 1) => {
     hardStop();
@@ -484,6 +474,13 @@ const StorybookViewer: React.FC<StorybookViewerProps> = ({
             <button onClick={handleNext} disabled={currentSpread >= papers.length} className="nav-button">{t.next}</button>
         </div>
 
+        {/* Phase 2 background loading indicator */}
+        {isPhase2Loading && (
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-full shadow-sm animate-pulse">
+            <span className="text-lg animate-spin">🎨</span>
+            <span className="text-xs font-bold text-indigo-600">Painting pages 4–6 in the background...</span>
+          </div>
+        )}
         {currentSpread >= papers.length && (
             <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl space-y-6 text-center animate-fade-in w-full max-w-xl border-4 border-blue-50">
                 <h2 className="text-4xl font-extrabold text-blue-600">{t.theEnd}</h2>

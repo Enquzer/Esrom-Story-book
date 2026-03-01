@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Page, Character, Language, SavedStory, PageBlueprint } from './types';
-import { generateFullStory, cartoonizeImage, getCredits } from './services/geminiService';
+import { generatePhase1, generatePhase2, cartoonizeImage, getCredits } from './services/geminiService';
 import { translations } from './translations';
 import { saveStoryToSupabase, getUserStories, getStoryById, getHighScores, updateHighScore } from './services/supabaseService';
 import { supabase } from './services/supabaseClient';
@@ -105,6 +105,7 @@ function App() {
   const [credits, setCredits] = useState<{ amount: number; date: string } | null>(null);
   const [activeGame, setActiveGame] = useState<'none' | 'spaceship' | 'basketball' | 'protect'>('none');
   const [highScores, setHighScores] = useState<any[] | null>(null);
+  const [isPhase2Loading, setIsPhase2Loading] = useState(false);
 
   const fetchHighScores = useCallback(async () => {
     try {
@@ -182,9 +183,6 @@ function App() {
     
     try {
       const email = user?.email || 'guest';
-      const fullStory = await generateFullStory(character, language, storyPrompt, email);
-      
-      setStoryTitle(fullStory.title);
       
       let cartoonImg: string | null = null;
       if (withImages && characterImage) {
@@ -194,26 +192,59 @@ function App() {
           setCartoonizedCharacterImage(cartoonImg);
         } catch (err: any) {
           console.error("Cartoonize error:", err);
+          // Non-fatal: continue without cartoonized image
         }
       }
 
-      const finalPages: Page[] = fullStory.pages.map((blueprint: any) => ({
-        pageText: blueprint.pageText,
-        imageUrl: '',
-        imagePrompt: blueprint.imagePrompt,
-        animation: blueprint.animation,
+      // ── PHASE 1: Story text + first 3 images ──────────────────────────
+      setLoadingMessage('✨ Writing your story & painting the first pages...');
+      const phase1Data = await generatePhase1(
+        character, language, storyPrompt,
+        withImages ? cartoonImg || characterImage : null,
+        email
+      );
+
+      // Build the 6 Page objects (pages 4-6 will have empty imageUrl at first)
+      const finalPages: Page[] = phase1Data.pages.map((p) => ({
+        pageText: p.pageText,
+        imageUrl: withImages ? (p.imageUrl || '') : '',
+        imagePrompt: p.imagePrompt,
+        animation: p.animation,
       }));
 
+      setStoryTitle(phase1Data.title);
       setStoryPages(finalPages);
       setStoryAudio(new Array(finalPages.length).fill(null));
       setStoryId(Date.now().toString());
       setIsSaved(false);
+      setIsLoading(false);       // ✅ Open the book NOW — user sees pages 1-3
       setView('storybook');
       refreshCredits();
 
+      // ── PHASE 2: Remaining 3 images silently in background ────────────
+      if (withImages && phase1Data.phase2Prompts?.length > 0) {
+        setIsPhase2Loading(true);
+        generatePhase2(
+          phase1Data.phase2Prompts,
+          cartoonImg || characterImage,
+          email
+        ).then((phase2Data) => {
+          // Patch only the last 3 pages, no full re-render of the book
+          setStoryPages(prev => prev.map((page, idx) => {
+            if (idx >= 3 && phase2Data.images[idx - 3]) {
+              return { ...page, imageUrl: phase2Data.images[idx - 3] };
+            }
+            return page;
+          }));
+        }).catch((err) => {
+          console.error('Phase 2 background load failed:', err);
+        }).finally(() => {
+          setIsPhase2Loading(false);
+        });
+      }
+
     } catch (err: any) {
       console.error("Story generation failed:", err);
-      // No matter what the error is, show the friendly Napping Modal instead of an alert
       setIsGeminiQuotaExhausted(true);
     } finally {
       setIsLoading(false);
@@ -481,7 +512,7 @@ function App() {
           {isLoading && <Loader message={loadingMessage} language={language} />}
 
           {view === 'storybook' && !isLoading && storyPages.length > 0 && storyId && (
-            <StorybookViewer key={storyId} pages={storyPages} pageAudio={storyAudio} onExit={handleExitToMenu} character={character} characterImage={cartoonizedCharacterImage} onSaveStory={async () => {
+            <StorybookViewer key={storyId} pages={storyPages} pageAudio={storyAudio} onExit={handleExitToMenu} character={character} characterImage={cartoonizedCharacterImage} isPhase2Loading={isPhase2Loading} onSaveStory={async () => {
               try {
                 setIsLoading(true);
                 if (user) {
